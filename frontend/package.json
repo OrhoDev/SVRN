@@ -1,0 +1,32 @@
+{
+  "name": "browser_example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "yarn build && playwright test browser.test.ts"
+  },
+  "dependencies": {
+    "@arcium-hq/client": "^0.6.2",
+    "@aztec/bb.js": "3.0.0-nightly.20260102",
+    "@coral-xyz/anchor": "^0.32.1",
+    "@noir-lang/noir_js": "1.0.0-beta.15",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/wallet-adapter-react-ui": "^0.9.39",
+    "@solana/wallet-adapter-wallets": "^0.19.37",
+    "@vitejs/plugin-react": "^5.1.2",
+    "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.19.5",
+    "typescript": "^5.8.3",
+    "vite": "^7.3.0",
+    "vite-plugin-node-polyfills": "0.24.0"
+  }
+}
