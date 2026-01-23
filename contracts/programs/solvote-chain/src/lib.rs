@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("4Yg7QBY94QFH48C9z3114SidMKHqjT2xVMTFnM6fCo9Q");
+declare_id!("AZesBUcWibfPn1omUmKxWjqbikmYDUK16X78SX995zSS");
 
 #[program]
 pub mod solvote_chain {

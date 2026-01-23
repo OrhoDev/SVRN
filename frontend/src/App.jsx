@@ -4,7 +4,9 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl, PublicKey } from '@solana/web3.js';
-import { getVotingPower, getWalletSecret, getMerkleProof } from './utils/chainUtils'; 
+// ⚠️ FIX: Import Merkle helpers
+import { getVotingPower, getWalletSecret } from './utils/chainUtils';
+import { buildEligibilityTree, getMerkleProof } from './utils/merkleTree';
 import { encryptVote } from './utils/arciumAdapter';
 // ⚠️ FIX: Aliased Terminal to TerminalIcon
 import { Terminal as TerminalIcon, Lock, Activity, Zap, Shield, Cpu, Layers, Disc, CheckCircle2 } from 'lucide-react';
@@ -14,7 +16,7 @@ import idl from './idl.json';
 import './index.css';
 
 // --- CONFIGURATION ---
-const RAW_ID = "4Yg7QBY94QFH48C9z3114SidMKHqjT2xVMTFnM6fCo9Q";
+const RAW_ID = "AZesBUcWibfPn1omUmKxWjqbikmYDUK16X78SX995zSS";
 let PROGRAM_ID;
 try { PROGRAM_ID = new PublicKey(RAW_ID.trim()); } catch (e) { console.error("ID_ERROR"); }
 
@@ -38,13 +40,20 @@ const hexToBytes = (hex) => {
     return bytes;
 };
 
+// FIELD MODULUS (For BigInt reduction if needed)
+const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+const reduceModField = (value) => {
+    const bigValue = typeof value === 'bigint' ? value : BigInt(value);
+    return bigValue % FIELD_MODULUS;
+};
+
 // --- WASM INIT HELPER ---
 async function initZKStack() {
     await Promise.all([initACVM(fetch(acvm)), initNoirC(fetch(noirc))]);
     const noir = new Noir(circuit);
     const barretenbergAPI = await Barretenberg.new();
     const backend = new UltraHonkBackend(circuit.bytecode, barretenbergAPI);
-    return { noir, backend };
+    return { noir, backend, barretenbergApi: barretenbergAPI };
 }
 
 const Dashboard = () => {
@@ -60,6 +69,8 @@ const Dashboard = () => {
     const [progress, setProgress] = useState(0); 
     const [zkEngine, setZkEngine] = useState(null); 
     const [liveVoteCount, setLiveVoteCount] = useState(0);
+    // ⚠️ NEW: Store local tree for demo purposes
+    const [merkleTree, setMerkleTree] = useState(null); 
     const bottomRef = useRef(null);
 
     const addLog = (msg, type = 'info') => {
@@ -69,7 +80,6 @@ const Dashboard = () => {
 
     useEffect(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), [logs]);
 
-    // Init ZK
     useEffect(() => {
         initZKStack().then((engine) => {
             setZkEngine(engine);
@@ -89,17 +99,12 @@ const Dashboard = () => {
                     PROGRAM_ID
                 );
                 // Try to fetch account, but handle deserialization errors gracefully
-                // (old proposals may not have voting_mint field)
                 try {
                     const account = await program.account.proposal.fetch(proposalPda);
                     setLiveVoteCount(account.voteCount.toNumber());
                 } catch (deserializeError) {
-                    // If deserialization fails, try to read raw account data
-                    // Old proposal structure: 8 (discriminator) + 8 (proposal_id) + 8 (vote_count) + 32 (authority) = 56 bytes
-                    // New structure adds 32 bytes for voting_mint = 88 bytes
                     const accountInfo = await connection.getAccountInfo(proposalPda);
                     if (accountInfo && accountInfo.data.length >= 24) {
-                        // Read vote_count from bytes 16-24 (after discriminator + proposal_id)
                         const voteCountBytes = accountInfo.data.slice(16, 24);
                         const voteCount = new BN(voteCountBytes, 'le', 8);
                         setLiveVoteCount(voteCount.toNumber());
@@ -118,16 +123,16 @@ const Dashboard = () => {
 
     const handleCreateProposal = async () => {
         if (!publicKey || !anchorWallet) return addLog("AUTH_ERR :: CONNECT_WALLET", 'error');
+        if (!zkEngine) return addLog("SYS_WAIT :: LOADING_KERNEL", 'info');
+        
         setIsLoading(true);
-        setStatusText("INITIALIZING_PROPOSAL");
-        setProgress(30);
+        setStatusText("BUILDING_MERKLE_TREE");
+        setProgress(10);
         try {
             const provider = new AnchorProvider(connection, anchorWallet, { preflightCommitment: 'confirmed' });
             const program = new Program(idl, provider);
             const PROPOSAL_ID_BN = new BN(proposalId);
             
-            // Pass SystemProgram as the voting mint for this demo (SOL)
-            // SystemProgram ID (1111...) represents native SOL
             const SOL_MINT = new PublicKey("11111111111111111111111111111111");
 
             const [proposalPda] = PublicKey.findProgramAddressSync(
@@ -135,14 +140,34 @@ const Dashboard = () => {
                 PROGRAM_ID
             );
 
-            addLog(`GOV::INIT_NODE >> ID: ${proposalId}`, 'info');
+            // 1. Build Merkle Tree (Snapshot)
+            addLog("MERKLE::BUILDING_TREE >> LOCAL_SNAPSHOT", 'info');
+            const userSecret = await getWalletSecret({ signMessage, publicKey }, proposalId);
+            const userBalance = await getVotingPower(connection, publicKey, SOL_MINT);
             
-            // For demo: Use zero root (in production, compute from eligible voters)
-            // TODO: Compute real Merkle root from eligibility snapshot using Barretenberg
-            const MERKLE_ROOT = new Uint8Array(32).fill(0);
+            // Build tree using helper (demo: just current user)
+            const treeData = await buildEligibilityTree([{ userSecret, balance: userBalance }]);
+            setMerkleTree(treeData);
             
+            // Convert root to bytes for on-chain storage
+            const rootBigInt = reduceModField(treeData.root);
+            const merkleRootBytes = new Uint8Array(32);
+            let rootHex = rootBigInt.toString(16);
+            if (rootHex.length > 64) {
+                rootHex = rootHex.slice(-64);
+            } else {
+                rootHex = rootHex.padStart(64, '0');
+            }
+            for (let i = 0; i < 32; i++) {
+                merkleRootBytes[i] = parseInt(rootHex.slice(i * 2, i * 2 + 2), 16);
+            }
+            
+            addLog(`GOV::INIT_NODE >> ID: ${proposalId}, Root: ${treeData.root.toString().slice(0, 10)}...`, 'info');
+            setProgress(50);
+
+            // 2. Send Transaction
             const tx = await program.methods
-                .initializeProposal(PROPOSAL_ID_BN, SOL_MINT, Array.from(MERKLE_ROOT))
+                .initializeProposal(PROPOSAL_ID_BN, SOL_MINT, Array.from(merkleRootBytes))
                 .accounts({
                 proposal: proposalPda,
                 authority: publicKey,
@@ -190,20 +215,17 @@ const Dashboard = () => {
                 );
                 try {
                     const proposalAccount = await program.account.proposal.fetch(proposalPda);
-                    // Anchor converts snake_case to camelCase
                     if (proposalAccount.votingMint) {
                         votingMint = proposalAccount.votingMint;
                     }
-                    // Fetch merkle_root (stored as [u8; 32] in Rust, comes as Buffer/Uint8Array)
                     if (proposalAccount.merkleRoot) {
-                        // Convert [u8; 32] to Field string (BigInt)
-                        // Read as little-endian u64 from first 8 bytes
                         const rootBytes = Buffer.from(proposalAccount.merkleRoot);
-                        const rootBigInt = rootBytes.readBigUInt64LE(0);
-                        merkleRoot = rootBigInt.toString();
+                        const rootBigInt = rootBytes.readBigUInt64LE(0); // This might be simplistic for 32 bytes
+                        // Better to convert full buffer to BigInt string
+                        const rootHex = rootBytes.toString('hex');
+                        merkleRoot = BigInt('0x' + rootHex).toString();
                     }
                 } catch (deserializeError) {
-                    // Old proposal structure doesn't have voting_mint or merkle_root
                     addLog("GOV_INFO :: Legacy proposal detected, using defaults", 'info');
                 }
             } catch (e) {
@@ -219,20 +241,31 @@ const Dashboard = () => {
             setStatusText("MPC_ENCRYPTING");
             setProgress(30);
             const userSecret = await getWalletSecret({ signMessage, publicKey }, proposalId); 
-            const merkleProof = getMerkleProof(userSecret, realBalance, merkleRoot);
+            
+            // If we have a local tree, use it to generate proof (demo mode)
+            // In production, we'd fetch the tree/proof from an indexer using the on-chain root
+            if (!merkleTree) {
+                 // Fallback: build tree on the fly for just this user (matches what we did in create)
+                 // Ideally, we should fetch the tree associated with the proposal
+                 throw new Error("Merkle tree not initialized locally. Please create proposal first (Demo limitation).");
+            }
+            
+            const merkleProof = await getMerkleProof(userSecret, realBalance, [{userSecret, balance: realBalance}], 0);
             
             addLog("MERKLE::PROOF_GENERATED", 'success');
 
             // Step 3: Generate ZK proof with Merkle inclusion
             setStatusText("ZK_PROVING");
             setProgress(50);
+            
             const inputs = {
-                user_secret: userSecret,
-                balance: realBalance,
-                merkle_path: merkleProof.path,
-                merkle_index: merkleProof.index,
-                merkle_root: merkleProof.root,
-                proposal_id: proposalId
+                user_secret: reduceModField(userSecret).toString(),
+                balance: Number(realBalance),
+                merkle_path: merkleProof.path.map(p => reduceModField(BigInt(p)).toString()),
+                merkle_index: merkleProof.index.toString(),
+                merkle_root: reduceModField(BigInt(merkleProof.root)).toString(),
+                proposal_id: reduceModField(proposalId).toString(),
+                cost: 1
             };
             
             addLog("ZK::EXECUTE >> GENERATING_SNARK_PROOF", 'info');

@@ -1,6 +1,6 @@
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
-import { getMerkleProof as generateMerkleProofFromTree } from './merkleTree.js';
+import { getMerkleProof as generateMerkleProofFromTree, buildEligibilityTree } from './merkleTree.js';
 
 /**
  * 1. Fetch Voting Power from SPL Token Account
@@ -44,17 +44,31 @@ export async function getVotingPower(connection, walletPubkey, votingMint) {
 
 /**
  * 2. Generate Real Merkle Proof
- * Fetches root from proposal account and generates proof structure.
+ * Builds tree and generates proof.
+ * 
+ * NOTE: For demo, builds tree with single voter.
+ * In production, would use full eligibility snapshot.
  * 
  * @param {string} userSecret - User's secret (as Field string)
  * @param {number} balance - User's balance
- * @param {string} merkleRoot - Merkle root from proposal account (as hex string or Field string)
- * @returns {{path: string[], index: number, root: string}}
+ * @param {string} storedRoot - Merkle root from proposal (for verification)
+ * @returns {Promise<{path: string[], index: number, root: string}>}
  */
-export function getMerkleProof(userSecret, balance, merkleRoot = "0") {
-    // Generate proof using the Merkle tree utility
-    // Pass the root fetched from on-chain proposal
-    return generateMerkleProofFromTree(userSecret, balance, merkleRoot, 0);
+export async function getMerkleProof(userSecret, balance, storedRoot = "0") {
+    // For demo: Build tree with just this voter
+    // In production: Use full eligibility list from snapshot
+    const eligibleVoters = [{ userSecret, balance }];
+    
+    // Build tree and generate proof
+    const proof = await generateMerkleProofFromTree(userSecret, balance, eligibleVoters, 0);
+    
+    // If storedRoot is provided and non-zero, use it (for verification)
+    // Otherwise use computed root
+    if (storedRoot !== "0" && storedRoot !== "0") {
+        proof.root = storedRoot;
+    }
+    
+    return proof;
 }
 
 /**
