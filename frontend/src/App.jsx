@@ -4,6 +4,7 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl, PublicKey } from '@solana/web3.js';
+
 // ⚠️ FIX: Import Merkle helpers
 import { getVotingPower, getWalletSecret } from './utils/chainUtils';
 import { buildEligibilityTree, getMerkleProof } from './utils/merkleTree';
@@ -16,9 +17,14 @@ import idl from './idl.json';
 import './index.css';
 
 // --- CONFIGURATION ---
-const RAW_ID = "AZesBUcWibfPn1omUmKxWjqbikmYDUK16X78SX995zSS";
+const RAW_ID = "Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU";
 let PROGRAM_ID;
 try { PROGRAM_ID = new PublicKey(RAW_ID.trim()); } catch (e) { console.error("ID_ERROR"); }
+
+// SPL CONSTANTS
+const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+const WRAPPED_SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 
 // --- ZK IMPORTS ---
 import { Barretenberg, UltraHonkBackend } from '@aztec/bb.js';
@@ -69,8 +75,14 @@ const Dashboard = () => {
     const [progress, setProgress] = useState(0); 
     const [zkEngine, setZkEngine] = useState(null); 
     const [liveVoteCount, setLiveVoteCount] = useState(0);
-    // ⚠️ NEW: Store local tree for demo purposes
     const [merkleTree, setMerkleTree] = useState(null); 
+    
+    // ⚠️ NEW: Token Choice State
+    const [votingMint, setVotingMint] = useState(WRAPPED_SOL_MINT.toBase58()); 
+    const [payoutMint, setPayoutMint] = useState(WRAPPED_SOL_MINT.toBase58());
+    const [payoutAmount, setPayoutAmount] = useState(0.1);
+    const [targetWallet, setTargetWallet] = useState(""); 
+
     const bottomRef = useRef(null);
 
     const addLog = (msg, type = 'info') => {
@@ -89,37 +101,33 @@ const Dashboard = () => {
 
     // Poll Chain Data
     useEffect(() => {
-        if (!anchorWallet) return;
+        if (!publicKey || !anchorWallet) {
+            setLiveVoteCount(0); 
+            return;
+        }
+
         const fetchChainData = async () => {
             try {
                 const provider = new AnchorProvider(connection, anchorWallet, { preflightCommitment: 'processed' });
                 const program = new Program(idl, provider);
+                
+                // ⚠️ FIX: Use 'proposal_v2' seed
                 const [proposalPda] = PublicKey.findProgramAddressSync(
-                    [Buffer.from("proposal"), new BN(proposalId).toArrayLike(Buffer, "le", 8)],
+                    [Buffer.from("proposal_v2"), new BN(proposalId).toArrayLike(Buffer, "le", 8)],
                     PROGRAM_ID
                 );
-                // Try to fetch account, but handle deserialization errors gracefully
-                try {
-                    const account = await program.account.proposal.fetch(proposalPda);
-                    setLiveVoteCount(account.voteCount.toNumber());
-                } catch (deserializeError) {
-                    const accountInfo = await connection.getAccountInfo(proposalPda);
-                    if (accountInfo && accountInfo.data.length >= 24) {
-                        const voteCountBytes = accountInfo.data.slice(16, 24);
-                        const voteCount = new BN(voteCountBytes, 'le', 8);
-                        setLiveVoteCount(voteCount.toNumber());
-                    } else {
-                        setLiveVoteCount(0);
-                    }
-                }
+                
+                const account = await program.account.proposal.fetch(proposalPda);
+                setLiveVoteCount(account.voteCount.toNumber());
             } catch (e) {
                 setLiveVoteCount(0);
             }
         };
-        fetchChainData();
+
+        fetchChainData(); 
         const interval = setInterval(fetchChainData, 5000); 
         return () => clearInterval(interval);
-    }, [proposalId, anchorWallet, connection]);
+    }, [proposalId, publicKey?.toBase58(), connection, anchorWallet]);
 
     const handleCreateProposal = async () => {
         if (!publicKey || !anchorWallet) return addLog("AUTH_ERR :: CONNECT_WALLET", 'error');
@@ -131,33 +139,37 @@ const Dashboard = () => {
         try {
             const provider = new AnchorProvider(connection, anchorWallet, { preflightCommitment: 'confirmed' });
             const program = new Program(idl, provider);
-            const PROPOSAL_ID_BN = new BN(proposalId);
             
-            const SOL_MINT = new PublicKey("11111111111111111111111111111111");
+            const PROPOSAL_ID_BN = new BN(proposalId);
+            const VOTING_MINT_PK = new PublicKey(votingMint);
+            const PAYOUT_MINT_PK = new PublicKey(payoutMint);
+            const RECIPIENT_PK = new PublicKey(targetWallet || publicKey.toBase58());
+            const AMOUNT_BN = new BN(payoutAmount * 1_000_000_000); // Decimals assumption (9)
 
+            // ⚠️ FIX: 'proposal_v2' seed
             const [proposalPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from("proposal"), PROPOSAL_ID_BN.toArrayLike(Buffer, "le", 8)],
+                [Buffer.from("proposal_v2"), PROPOSAL_ID_BN.toArrayLike(Buffer, "le", 8)],
                 PROGRAM_ID
             );
 
             // 1. Build Merkle Tree (Snapshot)
-            addLog("MERKLE::BUILDING_TREE >> LOCAL_SNAPSHOT", 'info');
+            addLog("MERKLE :: SNAPSHOTTING_ELIGIBILITY", 'info');
             const userSecret = await getWalletSecret({ signMessage, publicKey }, proposalId);
-            const userBalance = await getVotingPower(connection, publicKey, SOL_MINT);
+            const userBalance = await getVotingPower(connection, publicKey, VOTING_MINT_PK);
             
-            // Build tree using helper (demo: just current user)
-            const treeData = await buildEligibilityTree([{ userSecret, balance: userBalance }]);
+            // Build tree using helper
+            const treeData = await buildEligibilityTree(
+                [{ userSecret, balance: userBalance }], 
+                zkEngine.barretenbergApi
+            );
             setMerkleTree(treeData);
             
-            // Convert root to bytes for on-chain storage
+            // Convert root
             const rootBigInt = reduceModField(treeData.root);
             const merkleRootBytes = new Uint8Array(32);
             let rootHex = rootBigInt.toString(16);
-            if (rootHex.length > 64) {
-                rootHex = rootHex.slice(-64);
-            } else {
-                rootHex = rootHex.padStart(64, '0');
-            }
+            if (rootHex.length > 64) rootHex = rootHex.slice(-64);
+            else rootHex = rootHex.padStart(64, '0');
             for (let i = 0; i < 32; i++) {
                 merkleRootBytes[i] = parseInt(rootHex.slice(i * 2, i * 2 + 2), 16);
             }
@@ -165,15 +177,37 @@ const Dashboard = () => {
             addLog(`GOV::INIT_NODE >> ID: ${proposalId}, Root: ${treeData.root.toString().slice(0, 10)}...`, 'info');
             setProgress(50);
 
+            // ⚠️ NEW: Find ATA for Proposal Treasury
+            const [proposalTokenAccount] = PublicKey.findProgramAddressSync(
+                [
+                    proposalPda.toBuffer(),
+                    TOKEN_PROGRAM_ID.toBuffer(),
+                    PAYOUT_MINT_PK.toBuffer()
+                ],
+                ASSOCIATED_TOKEN_PROGRAM_ID
+            );
+
+            addLog("DAO::INIT >> CREATING_TREASURY_VAULT", 'info');
+
             // 2. Send Transaction
             const tx = await program.methods
-                .initializeProposal(PROPOSAL_ID_BN, SOL_MINT, Array.from(merkleRootBytes))
-                .accounts({
+            .initializeProposal(
+                PROPOSAL_ID_BN, 
+                Array.from(merkleRootBytes),
+                AMOUNT_BN
+            )
+            .accounts({
                 proposal: proposalPda,
+                proposalTokenAccount: proposalTokenAccount, // Auto-init ATA
+                votingMint: VOTING_MINT_PK,
+                treasuryMint: PAYOUT_MINT_PK,
+                targetWallet: RECIPIENT_PK,
                 authority: publicKey,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                 systemProgram: web3.SystemProgram.programId,
-                })
-                .rpc();
+            })
+            .rpc();
 
             addLog(`GOV_SUCCESS :: PROPOSAL #${proposalId} LIVE`, 'success');
             setProgress(100);
@@ -203,37 +237,34 @@ const Dashboard = () => {
             // Step 1: Fetch voting power and proposal info
             addLog("CHAIN::SCAN >> FETCHING_ELIGIBILITY", 'info');
             
-            // Get proposal to fetch voting_mint and merkle_root
-            let votingMint = web3.SystemProgram.programId; // Default to SOL
-            let merkleRoot = "0"; // Default root
+            let votingMint = WRAPPED_SOL_MINT; 
+            let merkleRoot = "0"; 
+
             try {
                 const provider = new AnchorProvider(connection, anchorWallet, { preflightCommitment: 'processed' });
                 const program = new Program(idl, provider);
+                
+                // ⚠️ FIX: 'proposal_v2' seed
                 const [proposalPda] = PublicKey.findProgramAddressSync(
-                    [Buffer.from("proposal"), new BN(proposalId).toArrayLike(Buffer, "le", 8)],
+                    [Buffer.from("proposal_v2"), new BN(proposalId).toArrayLike(Buffer, "le", 8)],
                     PROGRAM_ID
                 );
-                try {
-                    const proposalAccount = await program.account.proposal.fetch(proposalPda);
-                    if (proposalAccount.votingMint) {
-                        votingMint = proposalAccount.votingMint;
-                    }
-                    if (proposalAccount.merkleRoot) {
-                        const rootBytes = Buffer.from(proposalAccount.merkleRoot);
-                        const rootBigInt = rootBytes.readBigUInt64LE(0); // This might be simplistic for 32 bytes
-                        // Better to convert full buffer to BigInt string
-                        const rootHex = rootBytes.toString('hex');
-                        merkleRoot = BigInt('0x' + rootHex).toString();
-                    }
-                } catch (deserializeError) {
-                    addLog("GOV_INFO :: Legacy proposal detected, using defaults", 'info');
+
+                const proposalAccount = await program.account.proposal.fetch(proposalPda);
+                if (proposalAccount.votingMint) {
+                    votingMint = proposalAccount.votingMint;
+                }
+                if (proposalAccount.merkleRoot) {
+                    const rootBytes = Buffer.from(proposalAccount.merkleRoot);
+                    const rootHex = rootBytes.toString('hex');
+                    merkleRoot = BigInt('0x' + rootHex).toString();
                 }
             } catch (e) {
-                addLog("GOV_WARN :: Using default values", 'info');
+                addLog("GOV_WARN :: Unable to fetch proposal config, using defaults", 'info');
             }
             
             const realBalance = await getVotingPower(connection, publicKey, votingMint); 
-            if (realBalance < 1) throw new Error("INSUFFICIENT_STAKE");
+            if (realBalance < 1) throw new Error("INSUFFICIENT_STAKE (Balance: " + realBalance + ")");
             
             addLog(`STAKE::VERIFIED >> ${realBalance} credits`, 'success');
 
@@ -242,15 +273,17 @@ const Dashboard = () => {
             setProgress(30);
             const userSecret = await getWalletSecret({ signMessage, publicKey }, proposalId); 
             
-            // If we have a local tree, use it to generate proof (demo mode)
-            // In production, we'd fetch the tree/proof from an indexer using the on-chain root
             if (!merkleTree) {
-                 // Fallback: build tree on the fly for just this user (matches what we did in create)
-                 // Ideally, we should fetch the tree associated with the proposal
-                 throw new Error("Merkle tree not initialized locally. Please create proposal first (Demo limitation).");
-            }
-            
-            const merkleProof = await getMerkleProof(userSecret, realBalance, [{userSecret, balance: realBalance}], 0);
+                throw new Error("Merkle tree not initialized locally (Demo mode). Create proposal first.");
+           }
+
+            const merkleProof = await getMerkleProof(
+                userSecret, 
+                realBalance, 
+                [{userSecret, balance: realBalance}], 
+                0,
+                zkEngine.barretenbergApi 
+            );
             
             addLog("MERKLE::PROOF_GENERATED", 'success');
 
@@ -347,16 +380,56 @@ const Dashboard = () => {
             <div className="grid-cell" style={{ borderRight: '1px solid #222', padding: '2rem', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #0a0a0a 0%, #000 100%)' }}>
                 <div style={{ marginBottom: '2rem' }}>
                     <h3 style={{ color: '#888', fontSize: '0.65rem', fontWeight: 'bold', marginBottom: '1rem', letterSpacing: '2px', textTransform: 'uppercase' }}>CONFIGURATION</h3>
+                    
+                    {/* INPUTS */}
                     <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ fontSize: '0.6rem', color: '#555', fontFamily: 'monospace', display: 'block', marginBottom: '0.5rem' }}>PROPOSAL_ID</label>
+                        <label className="retro-label">PROPOSAL_ID</label>
                             <input 
                             className="retro-input" 
                                 type="number" 
                                 value={proposalId}
                                 onChange={(e) => setProposalId(Number(e.target.value))}
-                            style={{ fontFamily: 'monospace', background: '#111', border: '1px solid #333', color: '#fff' }}
                         />
                     </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label className="retro-label">VOTING_TOKEN_MINT</label>
+                        <input 
+                            className="retro-input" 
+                            value={votingMint}
+                            onChange={(e) => setVotingMint(e.target.value)}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label className="retro-label">PAYOUT_TOKEN_MINT</label>
+                        <input 
+                            className="retro-input" 
+                            value={payoutMint}
+                            onChange={(e) => setPayoutMint(e.target.value)}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label className="retro-label">PAYOUT_AMOUNT</label>
+                        <input 
+                            className="retro-input" 
+                            type="number"
+                            value={payoutAmount}
+                            onChange={(e) => setPayoutAmount(Number(e.target.value))}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label className="retro-label">RECIPIENT_ADDRESS</label>
+                        <input 
+                            className="retro-input" 
+                            value={targetWallet}
+                            onChange={(e) => setTargetWallet(e.target.value)}
+                            placeholder={publicKey ? publicKey.toBase58() : "Wallet Address"}
+                        />
+                    </div>
+
                     <button onClick={handleCreateProposal} disabled={isLoading} className="retro-btn" style={{ width: '100%', padding: '1rem', fontFamily: 'monospace', fontSize: '0.75rem', letterSpacing: '1px' }}>
                         INITIALIZE NODE
                     </button>

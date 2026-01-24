@@ -1,5 +1,5 @@
 {
-  "address": "AZesBUcWibfPn1omUmKxWjqbikmYDUK16X78SX995zSS",
+  "address": "Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU",
   "metadata": {
     "name": "solvote_chain",
     "version": "0.1.0",
@@ -7,6 +7,245 @@
     "description": "Created with Anchor"
   },
   "instructions": [
+    {
+      "name": "finalize_execution",
+      "discriminator": [
+        204,
+        146,
+        126,
+        8,
+        192,
+        189,
+        127,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal.proposal_id",
+                "account": "Proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "proposal_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal.treasury_mint",
+                "account": "Proposal"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "target_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "proposal.target_wallet",
+                "account": "Proposal"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal.treasury_mint",
+                "account": "Proposal"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
     {
       "name": "initialize_proposal",
       "discriminator": [
@@ -35,7 +274,10 @@
                   111,
                   115,
                   97,
-                  108
+                  108,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -46,9 +288,116 @@
           }
         },
         {
+          "name": "proposal_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "treasury_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "voting_mint"
+        },
+        {
+          "name": "treasury_mint"
+        },
+        {
+          "name": "target_wallet"
+        },
+        {
           "name": "authority",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
           "name": "system_program",
@@ -61,10 +410,6 @@
           "type": "u64"
         },
         {
-          "name": "voting_mint",
-          "type": "pubkey"
-        },
-        {
           "name": "merkle_root",
           "type": {
             "array": [
@@ -72,6 +417,10 @@
               32
             ]
           }
+        },
+        {
+          "name": "execution_amount",
+          "type": "u64"
         }
       ]
     },
@@ -190,6 +539,13 @@
       ]
     }
   ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AlreadyExecuted",
+      "msg": "Already executed."
+    }
+  ],
   "types": [
     {
       "name": "NullifierAccount",
@@ -247,10 +603,6 @@
             "type": "pubkey"
           },
           {
-            "name": "voting_mint",
-            "type": "pubkey"
-          },
-          {
             "name": "merkle_root",
             "type": {
               "array": [
@@ -258,6 +610,26 @@
                 32
               ]
             }
+          },
+          {
+            "name": "voting_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "execution_amount",
+            "type": "u64"
+          },
+          {
+            "name": "target_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_executed",
+            "type": "bool"
           }
         ]
       }

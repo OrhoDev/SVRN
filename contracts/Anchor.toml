@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-solvote_chain = "AZesBUcWibfPn1omUmKxWjqbikmYDUK16X78SX995zSS"
+solvote_chain = "Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU"
 
 [registry]
 url = "https://api.apr.dev"

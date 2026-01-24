@@ -4,14 +4,14 @@
  * Uses Barretenberg WASM to compute Pedersen hashes
  * compatible with Noir's std::hash::pedersen_hash
  * 
- * Each leaf: pedersen_hash(user_secret, balance)
- * Tree height: 3 (supports up to 8 voters)
+ * OPTIMIZATIONS:
+ * 1. Parallel hashing using Promise.all
+ * 2. Accepts existing Barretenberg instance to avoid WASM re-init
  */
 
 import { Barretenberg } from '@aztec/bb.js';
 
 // Field class helper (simplified version of Fr from Barretenberg)
-// We'll use BigInt and Buffer directly to avoid importing internal classes
 class Field {
     constructor(value) {
         // Accept BigInt or string (Field as string)
@@ -47,29 +47,18 @@ class Field {
     }
 }
 
-// Singleton Barretenberg instance
-let barretenbergInstance = null;
-
-/**
- * Get or create Barretenberg instance
- */
-async function getBarretenberg() {
-    if (!barretenbergInstance) {
-        barretenbergInstance = await Barretenberg.new();
-    }
-    return barretenbergInstance;
-}
-
 /**
  * Compute Pedersen hash using Barretenberg
  * Compatible with Noir's std::hash::pedersen_hash
  * 
  * @param {string|bigint} input1 - First Field value
  * @param {string|bigint} input2 - Second Field value
+ * @param {Object} [bbInstance] - Optional initialized Barretenberg instance
  * @returns {Promise<string>} Hash result as Field string
  */
-export async function pedersenHash(input1, input2) {
-    const bb = await getBarretenberg();
+export async function pedersenHash(input1, input2, bbInstance) {
+    // Use injected instance or fallback to creating a new one (slower)
+    const bb = bbInstance || await Barretenberg.new();
     
     // Convert inputs to Field buffers
     const field1 = new Field(input1);
@@ -93,14 +82,15 @@ export async function pedersenHash(input1, input2) {
  * @param {number} balance - User's balance
  * @param {Object} treeData - Tree data from buildEligibilityTree
  * @param {number} voterIndex - Index of voter in eligibility list
+ * @param {Object} [bbInstance] - Optional initialized Barretenberg instance
  * @returns {Promise<{path: string[], index: number, root: string}>}
  */
-export async function generateMerkleProof(userSecret, balance, treeData, voterIndex) {
+export async function generateMerkleProof(userSecret, balance, treeData, voterIndex, bbInstance) {
     const { tree, root, leafMap } = treeData;
     
     // Compute the leaf hash (same as in tree building)
     const balanceField = balance.toString();
-    const leafHash = await pedersenHash(userSecret, balanceField);
+    const leafHash = await pedersenHash(userSecret, balanceField, bbInstance);
     
     // Verify this leaf exists in the tree
     if (!leafMap.has(leafHash) && voterIndex < tree[0].length) {
@@ -153,26 +143,30 @@ export async function generateMerkleProof(userSecret, balance, treeData, voterIn
  * @param {number} balance - User's balance
  * @param {Array<{userSecret: string, balance: number}>} eligibleVoters - All eligible voters
  * @param {number} voterIndex - Index of voter in eligibility list
+ * @param {Object} [bbInstance] - Optional initialized Barretenberg instance
  * @returns {Promise<{path: string[], index: number, root: string}>}
  */
-export async function getMerkleProof(userSecret, balance, eligibleVoters, voterIndex = 0) {
+export async function getMerkleProof(userSecret, balance, eligibleVoters, voterIndex = 0, bbInstance) {
     // Build tree with all eligible voters
-    const treeData = await buildEligibilityTree(eligibleVoters);
+    const treeData = await buildEligibilityTree(eligibleVoters, bbInstance);
     
     // Generate proof for this voter
-    return generateMerkleProof(userSecret, balance, treeData, voterIndex);
+    return generateMerkleProof(userSecret, balance, treeData, voterIndex, bbInstance);
 }
 
 /**
  * Build eligibility Merkle tree
  * 
  * @param {Array<{userSecret: string, balance: number}>} eligibleVoters - List of eligible voters
+ * @param {Object} [bbInstance] - Optional initialized Barretenberg instance
  * @returns {Promise<{tree: Array, root: string, leaves: Array, leafMap: Map}>}
  */
-export async function buildEligibilityTree(eligibleVoters) {
+export async function buildEligibilityTree(eligibleVoters, bbInstance) {
     if (eligibleVoters.length === 0) {
         throw new Error("Cannot build tree with no eligible voters");
     }
+
+    const bb = bbInstance || await Barretenberg.new();
     
     // Tree height 3 supports up to 8 voters (2^3 = 8)
     // Pad to power of 2 if needed
@@ -184,22 +178,21 @@ export async function buildEligibilityTree(eligibleVoters) {
         paddedVoters.push({ userSecret: "0", balance: 0 });
     }
     
-    // Step 1: Compute all leaves
+    // Step 1: Compute all leaves in PARALLEL
     // Leaf = pedersen_hash(user_secret, balance)
-    const leaves = [];
-    const leafMap = new Map(); // Map leaf hash -> voter index
-    
     console.log("Computing leaves...");
-    for (let i = 0; i < paddedVoters.length; i++) {
-        const voter = paddedVoters[i];
+    
+    const leafPromises = paddedVoters.map(voter => {
         const balanceField = voter.balance.toString();
-        const leaf = await pedersenHash(voter.userSecret, balanceField);
-        leaves.push(leaf);
-        
-        // Only map real voters (not padding)
-        if (i < eligibleVoters.length) {
-            leafMap.set(leaf, i);
-        }
+        return pedersenHash(voter.userSecret, balanceField, bb);
+    });
+
+    const leaves = await Promise.all(leafPromises);
+    
+    // Reconstruct Map for O(1) lookups
+    const leafMap = new Map(); 
+    for (let i = 0; i < eligibleVoters.length; i++) {
+        leafMap.set(leaves[i], i);
     }
     
     console.log(`✅ Computed ${leaves.length} leaves`);
@@ -211,13 +204,19 @@ export async function buildEligibilityTree(eligibleVoters) {
     
     while (currentLevel.length > 1) {
         const nextLevel = [];
+        const pairPromises = [];
+
+        // Batch hash calculations for this level
         for (let i = 0; i < currentLevel.length; i += 2) {
             const left = currentLevel[i];
             const right = currentLevel[i + 1] || "0"; // Pad with zero if odd
             // Parent = pedersen_hash(left, right)
-            const parent = await pedersenHash(left, right);
-            nextLevel.push(parent);
+            pairPromises.push(pedersenHash(left, right, bb));
         }
+
+        const nextLevelNodes = await Promise.all(pairPromises);
+        nextLevel.push(...nextLevelNodes);
+        
         tree.push(nextLevel);
         currentLevel = nextLevel;
     }

@@ -229,6 +229,37 @@ async function main() {
     console.log("=================================");
     console.log(`   TOTAL YES POWER: ${totalYesPower}`);
     console.log("=================================");
-}
 
+    // ⚠️ THE ENGINE TRIGGER
+    // If YES power exists, we execute the on-chain settlement
+    if (totalYesPower > 0) {
+        console.log("\n🚀 WINNING THRESHOLD REACHED. TRIGGERING SETTLEMENT...");
+        
+        try {
+            // Reconstruct Proposal PDA
+            const [proposalPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("proposal"), new BN(1).toArrayLike(Buffer, "le", 8)], // Assuming ID 1 for tally
+                SOLVOTE_ID
+            );
+
+            const tx = await solanaProgram.methods
+                .finalizeExecution()
+                .accounts({
+                    proposal: proposalPda,
+                    authority: wallet.publicKey,
+                })
+                .rpc();
+
+            console.log(`✅ ON-CHAIN EXECUTION FINALIZED! TX: ${tx}`);
+            
+            // Read back the payload to show what was decided
+            const propAcc = await solanaProgram.account.proposal.fetch(proposalPda);
+            const payload = Buffer.from(propAcc.executionPayload).toString();
+            console.log(`📡 PROCESSED ACTION: ${payload}`);
+
+        } catch (e: any) {
+            console.error("❌ Execution Trigger Failed:", e.message);
+        }
+    }
+}
 main();
