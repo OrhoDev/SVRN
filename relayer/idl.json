@@ -97,8 +97,7 @@
               },
               {
                 "kind": "account",
-                "path": "proposal.treasury_mint",
-                "account": "Proposal"
+                "path": "treasury_mint"
               }
             ],
             "program": {
@@ -147,8 +146,7 @@
             "seeds": [
               {
                 "kind": "account",
-                "path": "proposal.target_wallet",
-                "account": "Proposal"
+                "path": "target_wallet"
               },
               {
                 "kind": "const",
@@ -189,8 +187,7 @@
               },
               {
                 "kind": "account",
-                "path": "proposal.treasury_mint",
-                "account": "Proposal"
+                "path": "treasury_mint"
               }
             ],
             "program": {
@@ -233,6 +230,12 @@
           }
         },
         {
+          "name": "target_wallet"
+        },
+        {
+          "name": "treasury_mint"
+        },
+        {
           "name": "authority",
           "signer": true,
           "relations": [
@@ -240,8 +243,7 @@
           ]
         },
         {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          "name": "token_program"
         }
       ],
       "args": []
@@ -392,8 +394,7 @@
           "signer": true
         },
         {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          "name": "token_program"
         },
         {
           "name": "associated_token_program",
@@ -421,6 +422,38 @@
         {
           "name": "execution_amount",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_tally",
+      "discriminator": [
+        143,
+        23,
+        13,
+        225,
+        158,
+        93,
+        36,
+        61
+      ],
+      "accounts": [
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "proposal"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "result",
+          "type": "u8"
         }
       ]
     },
@@ -544,6 +577,11 @@
       "code": 6000,
       "name": "AlreadyExecuted",
       "msg": "Already executed."
+    },
+    {
+      "code": 6001,
+      "name": "ProposalNotPassed",
+      "msg": "Proposal did not pass."
     }
   ],
   "types": [
@@ -626,6 +664,10 @@
           {
             "name": "target_wallet",
             "type": "pubkey"
+          },
+          {
+            "name": "tally_result",
+            "type": "u8"
           },
           {
             "name": "is_executed",

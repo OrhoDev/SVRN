@@ -1,10 +1,11 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
+import { Barretenberg, Fr } from '@aztec/bb.js'; 
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { Buffer } from 'buffer'; // Good practice to import explicit Buffer
+import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 dotenv.config();
 
@@ -12,130 +13,180 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- CONFIGURATION ---
 const PORT = 3000;
 const RPC_URL = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
-
-// ⚠️ FIX 1: UPDATE TO YOUR NEW DEPLOYED PROGRAM ID (From contracts/target/deploy/solvote_chain-keypair.json or lib.rs)
-// Check your App.jsx or lib.rs for the one starting with "AZes..."
 const PROGRAM_ID = new PublicKey("Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU"); 
 
-// Load Relayer Wallet
 const keypairData = JSON.parse(fs.readFileSync('./relayer-keypair.json', 'utf-8'));
 const relayerWallet = Keypair.fromSecretKey(new Uint8Array(keypairData));
-
-// ⚠️ REMINDER: Ensure this is the NEW idl.json from `contracts/target/idl/`
 const idl = JSON.parse(fs.readFileSync('./idl.json', 'utf-8'));
 
-// Setup Anchor
 const connection = new Connection(RPC_URL, "confirmed");
 const walletWrapper = new anchor.Wallet(relayerWallet);
 const provider = new anchor.AnchorProvider(connection, walletWrapper, { commitment: "confirmed" });
-const program = new anchor.Program(idl, provider);
+const program = new anchor.Program(idl, provider) as any;
 
-console.log("🚀 SolVote Relayer Started");
-console.log("   Address:", relayerWallet.publicKey.toBase58());
-console.log("   Target Program:", PROGRAM_ID.toBase58());
+const SNAPSHOT_DB: Record<string, any> = {};
 
-app.post('/relay-vote', async (req, res) => {
+console.log("🚀 SVRN Sovereign Relayer Online");
+
+// --- ZK KERNEL (Using Async Barretenberg for stability) ---
+let bb: any;
+async function initZK() {
+    console.log("   Initializing Barretenberg WASM (Async Mode)...");
+    bb = await Barretenberg.new();
+    console.log("   ✅ ZK Backend Ready");
+}
+initZK();
+
+// --- NOIR-COMPATIBLE HASHING ---
+/**
+ * Based on the Aztec Forum & Noir Tutorial:
+ * Noir's pedersen_hash([a, b]) = Barretenberg's pedersenHash([a, b], 0)
+ * We use the Fr class to ensure every input has the .toBuffer() method.
+ */
+async function noirHash(input1: any, input2: any): Promise<Fr> {
+    const toFr = (val: any) => {
+        if (val instanceof Fr) return val;
+        if (typeof val === 'bigint' || typeof val === 'number') return new Fr(BigInt(val));
+        const clean = val.toString().replace('0x', '');
+        return Fr.fromString(clean);
+    };
+
+    const f1 = toFr(input1);
+    const f2 = toFr(input2);
+
+    // Using the async Barretenberg instance
+    // inputs: Fr[]
+    // index: number (0 is default for Noir)
+    const result = await bb.pedersenHash([f1, f2], 0);
+    
+    // Result is an Fr object or Buffer
+    return (result instanceof Fr) ? result : Fr.fromBuffer(result);
+}
+
+function deriveSecret(pubkeyStr: string): bigint {
+    const buffer = Buffer.from(pubkeyStr);
+    let hash = 0n;
+    const MOD = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001n;
+    for (const byte of buffer) {
+        hash = (hash << 8n) + BigInt(byte);
+        hash = hash % MOD;
+    }
+    return hash;
+}
+
+// ==========================================
+// SNAPSHOT & MERKLE LOGIC
+// ==========================================
+
+app.post('/initialize-snapshot', async (req: Request, res: Response) => {
     try {
-        console.log("\n📥 Received Vote Request...");
-        
-        const { 
-            proof,          
-            nullifier,      
-            ciphertext,     
-            pubkey,         
-            nonce,          
-            proposalId      
-        } = req.body;
+        if (!bb) return res.status(503).json({ error: "ZK Backend initializing..." });
+        const { votingMint, proposalId } = req.body;
+        const propKey = proposalId.toString(); 
 
-        // 1. Reconstruct Data types
-        const proofBuf = Buffer.from(proof);
-        const nullifierBuf = Buffer.from(nullifier);
-        const ciphertextBuf = Buffer.from(ciphertext);
-        const pubkeyBuf = Buffer.from(pubkey);
-        const nonceBuf = Buffer.from(nonce);
-        const nonceBN = new anchor.BN(nonceBuf, 'le');
-        const proposalBn = new anchor.BN(proposalId);
-
-        console.log(`   - Nullifier: ${nullifierBuf.toString('hex').slice(0, 10)}...`);
-        console.log(`   - Proposal ID: ${proposalId}`);
-
-        // 2. Derive PDAs
-        // ⚠️ FIX 2: MUST USE "proposal_v2" TO MATCH BACKEND
-        const [proposalPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("proposal_v2"), proposalBn.toArrayLike(Buffer, "le", 8)],
-            program.programId
-        );
-
-        // Derive Nullifier PDA (This uses the proposalPda we just calculated)
-        const [nullifierPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("nullifier"), proposalPda.toBuffer(), nullifierBuf],
-            program.programId
-        );
-
-        // 3. Construct Transaction
-        const instruction = await program.methods
-            .submitVote(
-                Array.from(nullifierBuf), 
-                ciphertextBuf,
-                Array.from(pubkeyBuf),
-                nonceBN
-            )
-            .accounts({
-                proposal: proposalPda,
-                nullifierAccount: nullifierPda,
-                relayer: relayerWallet.publicKey,
-                systemProgram: anchor.web3.SystemProgram.programId,
+        const response = await fetch(RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 'svrn', method: 'getTokenAccounts',
+                params: { mint: votingMint, limit: 1000, options: { showZeroBalance: false } }
             })
-            .instruction();
-
-        const transaction = new anchor.web3.Transaction().add(instruction);
-        const latestBlockhash = await connection.getLatestBlockhash();
-        transaction.recentBlockhash = latestBlockhash.blockhash;
-        transaction.feePayer = relayerWallet.publicKey;
-        
-        transaction.sign(relayerWallet);
-        
-        console.log("   🚀 Sending Transaction...");
-        const tx = await connection.sendRawTransaction(transaction.serialize(), {
-            skipPreflight: false,
-            maxRetries: 3,
-        });
-        
-        console.log(`   ✅ Sent! Waiting for confirmation... (${tx})`);
-        await connection.confirmTransaction(tx, "confirmed");
-
-        console.log("   🎉 Transaction Confirmed");
-        
-        res.json({ 
-            success: true, 
-            tx: tx,
-            explorer: `https://explorer.solana.com/tx/${tx}?cluster=devnet`
         });
 
-    } catch (error) {
-        // Safe way to extract message from unknown error
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        
-        console.error("❌ Relay Error:", errorMessage);
-        
-        // Handle "Account already exists" (Double Vote attempt)
-        if (errorMessage.includes("already in use")) {
-            res.status(400).json({ 
-                success: false, 
-                error: "Double Vote Detected (Nullifier Used)" 
-            });
-        } else {
-            res.status(500).json({ 
-                success: false, 
-                error: errorMessage 
-            });
+        const data: any = await response.json();
+        const accounts = data.result?.token_accounts || [];
+        const voters = accounts.map((acc: any) => ({ owner: acc.owner, balance: Number(acc.amount) }))
+            .filter((v: any) => v.balance > 0).slice(0, 8); 
+
+        if (voters.length === 0) throw new Error("No token holders found.");
+
+        const leavesFr: Fr[] = [];
+        const voterMap: Record<string, any> = {};
+
+        // 1. Build Leaves (Sequential to avoid WASM concurrency issues)
+        for (let i = 0; i < voters.length; i++) {
+            const v = voters[i];
+            const secretVal = deriveSecret(v.owner);
+            const leaf = await noirHash(secretVal, v.balance);
+            leavesFr.push(leaf);
+
+            voterMap[v.owner] = { 
+                index: i, 
+                balance: v.balance, 
+                secret: "0x" + secretVal.toString(16), 
+                leaf: leaf.toString() 
+            };
         }
+
+        // 2. Pad Tree
+        const zeroLeaf = await noirHash(0, 0);
+        while (leavesFr.length < 8) leavesFr.push(zeroLeaf);
+
+        // 3. Build Tree
+        const levels: string[][] = [leavesFr.map(f => f.toString())];
+        let currentLevel: Fr[] = leavesFr;
+        while (currentLevel.length > 1) {
+            const nextLevel: Fr[] = [];
+            for (let i = 0; i < currentLevel.length; i += 2) {
+                nextLevel.push(await noirHash(currentLevel[i], currentLevel[i+1]));
+            }
+            currentLevel = nextLevel;
+            levels.push(currentLevel.map(f => f.toString()));
+        }
+
+        const root = levels[levels.length - 1][0];
+        SNAPSHOT_DB[propKey] = { root, voterMap, levels };
+
+        console.log(`📸 [SNAPSHOT] Prop #${propKey} | Root: ${root.slice(0, 16)}...`);
+        res.json({ success: true, root, count: voters.length });
+    } catch (e: any) {
+        console.error("SNAPSHOT_ERROR:", e.message);
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`📡 Relayer listening on http://localhost:${PORT}`);
+app.post('/get-proof', (req: Request, res: Response) => {
+    try {
+        const { proposalId, userPubkey } = req.body;
+        const snap = SNAPSHOT_DB[proposalId.toString()];
+        if (!snap) return res.status(404).json({ error: "Snapshot not found" });
+        const voter = snap.voterMap[userPubkey];
+        if (!voter) return res.status(403).json({ error: "Ineligible" });
+
+        const path: string[] = [];
+        let currIdx = voter.index;
+        for (let i = 0; i < 3; i++) {
+            const siblingIdx = (currIdx % 2 === 0) ? currIdx + 1 : currIdx - 1;
+            path.push(snap.levels[i][siblingIdx]);
+            currIdx = Math.floor(currIdx / 2);
+        }
+        res.json({ success: true, proof: { ...voter, path, root: snap.root } });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
+
+app.post('/relay-vote', async (req: Request, res: Response) => {
+    try {
+        const { nullifier, ciphertext, pubkey, nonce, proposalId } = req.body;
+        const proposalBn = new anchor.BN(proposalId);
+        const [proposalPda] = PublicKey.findProgramAddressSync([Buffer.from("proposal_v2"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+        const [nullifierPda] = PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
+
+        const tx = await program.methods.submitVote(
+            [...Buffer.from(nullifier)], 
+            Buffer.from(ciphertext), 
+            [...Buffer.from(pubkey)], 
+            new anchor.BN(Buffer.from(nonce), 'le')
+        ).accounts({ 
+            proposal: proposalPda, 
+            nullifierAccount: nullifierPda, 
+            relayer: relayerWallet.publicKey, 
+            systemProgram: anchor.web3.SystemProgram.programId 
+        }).signers([relayerWallet]).rpc();
+
+        res.json({ success: true, tx });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.listen(PORT, () => console.log(`📡 Relayer listening on http://localhost:${PORT}`));

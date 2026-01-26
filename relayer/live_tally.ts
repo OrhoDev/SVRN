@@ -17,7 +17,7 @@ import {
 dotenv.config();
 
 // 1. CONFIGURATION
-const SOLVOTE_ID = new PublicKey("4Yg7QBY94QFH48C9z3114SidMKHqjT2xVMTFnM6fCo9Q");
+const SOLVOTE_ID = new PublicKey("Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU");
   // Arcium MXE Program ID (deployed with arcium deploy)
   const ARCIUM_ID = new PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
 

@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+// ✅ Import from token_interface to support both SPL and Token-2022
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use anchor_spl::associated_token::AssociatedToken;
 
-declare_id!("Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU");
+declare_id!("Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU"); 
 
 #[program]
 pub mod solvote_chain {
@@ -16,24 +17,18 @@ pub mod solvote_chain {
     ) -> Result<()> {
         let proposal = &mut ctx.accounts.proposal;
         
-        // 1. Config
         proposal.proposal_id = proposal_id;
-        proposal.vote_count = 0;
         proposal.authority = ctx.accounts.authority.key();
         proposal.merkle_root = merkle_root;
+        proposal.tally_result = 0; 
         proposal.is_executed = false;
-
-        // 2. Execution Config
         proposal.execution_amount = execution_amount;
         proposal.target_wallet = ctx.accounts.target_wallet.key();
         
-        // 3. Token Config
         proposal.voting_mint = ctx.accounts.voting_mint.key();
         proposal.treasury_mint = ctx.accounts.treasury_mint.key();
-
+    
         msg!("DAO::INIT >> Proposal #{} (v2) initialized.", proposal_id);
-        msg!("DAO::CONFIG >> Voting: {}, Payout: {}", proposal.voting_mint, proposal.treasury_mint);
-             
         Ok(())
     }
 
@@ -51,11 +46,19 @@ pub mod solvote_chain {
         Ok(())
     }
 
+    pub fn set_tally(ctx: Context<SetTally>, result: u8) -> Result<()> {
+        let proposal = &mut ctx.accounts.proposal;
+        require!(!proposal.is_executed, ErrorCode::AlreadyExecuted);
+        proposal.tally_result = result;
+        msg!("DAO::TALLY >> Result set to {}", result);
+        Ok(())
+    }
+
     pub fn finalize_execution(ctx: Context<ExecuteProposal>) -> Result<()> {
         let proposal = &mut ctx.accounts.proposal;
         require!(!proposal.is_executed, ErrorCode::AlreadyExecuted);
-
-        // 1. Setup Seeds for PDA Signing (using v2 seed)
+        require!(proposal.tally_result == 1, ErrorCode::ProposalNotPassed);
+    
         let proposal_id_bytes = proposal.proposal_id.to_le_bytes();
         let seeds = &[
             b"proposal_v2", 
@@ -63,25 +66,23 @@ pub mod solvote_chain {
             &[ctx.bumps.proposal],
         ];
         let signer_seeds = &[&seeds[..]];
-
-        // 2. Define Transfer Accounts
-        let cpi_accounts = Transfer {
+    
+        // ✅ Uses TokenInterface types safely
+        let cpi_accounts = TransferChecked {
             from: ctx.accounts.proposal_token_account.to_account_info(),
-            to: ctx.accounts.target_token_account.to_account_info(),     
-            authority: proposal.to_account_info(),                       
+            to: ctx.accounts.target_token_account.to_account_info(),
+            authority: proposal.to_account_info(),
+            mint: ctx.accounts.treasury_mint.to_account_info(),
         };
         
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-
-        // 3. Execute Transfer
-        let amount = proposal.execution_amount;
-        token::transfer(cpi_ctx, amount)?;
-
-        // 4. Mark Complete
+    
+        let decimals = ctx.accounts.treasury_mint.decimals;
+        token_interface::transfer_checked(cpi_ctx, proposal.execution_amount, decimals)?;
+    
         proposal.is_executed = true;
-        msg!("DAO::EXECUTE >> Sent {} tokens", amount);
-        
+        msg!("DAO::EXECUTE >> Transfer Complete");
         Ok(())
     }
 }
@@ -94,32 +95,30 @@ pub struct InitProposal<'info> {
     #[account(
         init,
         payer = authority,
-        // Increased space for safety + new fields
-        space = 8 + 8 + 8 + 32 + 32 + 32 + 8 + 32 + 32 + 32 + 1 + 64,
-        // ⚠️ FIXED: Versioned Seed
+        space = 8 + 8 + 8 + 32 + 32 + 32 + 8 + 32 + 32 + 32 + 1 + 1 + 64,
         seeds = [b"proposal_v2", proposal_id.to_le_bytes().as_ref()],
         bump
     )]
     pub proposal: Account<'info, Proposal>,
 
-    // Automatic Vault Creation
     #[account(
         init,
         payer = authority,
         associated_token::mint = treasury_mint,
         associated_token::authority = proposal
     )]
-    pub proposal_token_account: Account<'info, TokenAccount>,
+    pub proposal_token_account: InterfaceAccount<'info, TokenAccount>, 
 
-    pub voting_mint: Account<'info, Mint>,   
-    pub treasury_mint: Account<'info, Mint>, 
-    
-    /// CHECK: Target wallet logic
+    pub voting_mint: InterfaceAccount<'info, Mint>,   
+    pub treasury_mint: InterfaceAccount<'info, Mint>, 
+
+    /// CHECK: Recipient address for the execution funds.
     pub target_wallet: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub token_program: Program<'info, Token>,
+
+    pub token_program: Interface<'info, TokenInterface>, 
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
@@ -128,7 +127,6 @@ pub struct InitProposal<'info> {
 pub struct ExecuteProposal<'info> {
     #[account(
         mut,
-        // ⚠️ FIXED: Versioned Seed
         seeds = [b"proposal_v2", proposal.proposal_id.to_le_bytes().as_ref()],
         bump,
         has_one = authority
@@ -137,20 +135,32 @@ pub struct ExecuteProposal<'info> {
 
     #[account(
         mut,
-        associated_token::mint = proposal.treasury_mint,
+        associated_token::mint = treasury_mint,
         associated_token::authority = proposal
     )]
-    pub proposal_token_account: Account<'info, TokenAccount>,
+    pub proposal_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
-        associated_token::mint = proposal.treasury_mint,
-        associated_token::authority = proposal.target_wallet
+        associated_token::mint = treasury_mint,
+        associated_token::authority = target_wallet
     )]
-    pub target_token_account: Account<'info, TokenAccount>,
+    pub target_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK: Destination wallet verified by the Proposal account state.
+    pub target_wallet: UncheckedAccount<'info>,
+
+    pub treasury_mint: InterfaceAccount<'info, Mint>,
 
     pub authority: Signer<'info>,
-    pub token_program: Program<'info, Token>,
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
+#[derive(Accounts)]
+pub struct SetTally<'info> {
+    #[account(mut, has_one = authority)]
+    pub proposal: Account<'info, Proposal>,
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -179,12 +189,11 @@ pub struct Proposal {
     pub vote_count: u64,
     pub authority: Pubkey,
     pub merkle_root: [u8; 32],
-    
     pub voting_mint: Pubkey,   
     pub treasury_mint: Pubkey, 
-    
     pub execution_amount: u64, 
     pub target_wallet: Pubkey, 
+    pub tally_result: u8, 
     pub is_executed: bool,
 }
 
@@ -201,4 +210,6 @@ pub struct NullifierAccount {
 pub enum ErrorCode {
     #[msg("Already executed.")]
     AlreadyExecuted,
+    #[msg("Proposal did not pass.")]
+    ProposalNotPassed,
 }
