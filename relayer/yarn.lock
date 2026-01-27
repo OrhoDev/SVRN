@@ -84,6 +84,33 @@
 "@noble/hashes@^1.3.1", "@noble/hashes@^1.4.0", "@noble/hashes@^1.7.1", "@noble/hashes@1.8.0":
   version "1.8.0"
 
+"@noir-lang/acvm_js@1.0.0-beta.18":
+  version "1.0.0-beta.18"
+  resolved "https://registry.npmjs.org/@noir-lang/acvm_js/-/acvm_js-1.0.0-beta.18.tgz"
+  integrity sha512-QQXAaowxSzGKk+Ua7ofc2jcpvUTYSxmDuF5SzwwOFMue9+ccp9QcqOkjyyIZWjtapcenV7YCXrzcBjvEt7N8Nw==
+
+"@noir-lang/noir_js@^1.0.0-beta.18":
+  version "1.0.0-beta.18"
+  resolved "https://registry.npmjs.org/@noir-lang/noir_js/-/noir_js-1.0.0-beta.18.tgz"
+  integrity sha512-J0VSw13U9SQpejh1sWNEjuKxjl/uJblOmWJMdlpYqCetth9oBAnKv8+IMk0bZlkrjDp22Yf8vMDkf+Qb8KBZ2Q==
+  dependencies:
+    "@noir-lang/acvm_js" "1.0.0-beta.18"
+    "@noir-lang/noirc_abi" "1.0.0-beta.18"
+    "@noir-lang/types" "1.0.0-beta.18"
+    pako "^2.1.0"
+
+"@noir-lang/noirc_abi@1.0.0-beta.18":
+  version "1.0.0-beta.18"
+  resolved "https://registry.npmjs.org/@noir-lang/noirc_abi/-/noirc_abi-1.0.0-beta.18.tgz"
+  integrity sha512-ZLobgQwGbxBpR4iMQpCpYQS4EaM25Fl31rVkrcteQIwcz5kAknH1Yc5FJYICCxzO1HEFj6coAzF3FXO/Ic4p4Q==
+  dependencies:
+    "@noir-lang/types" "1.0.0-beta.18"
+
+"@noir-lang/types@1.0.0-beta.18":
+  version "1.0.0-beta.18"
+  resolved "https://registry.npmjs.org/@noir-lang/types/-/types-1.0.0-beta.18.tgz"
+  integrity sha512-/1nsk8qFd27P6bW4W5ayUjMQpN6PustwTJEqZPNP//DZ6TrolnWxT/Y+7v9d2/a4OZal61sx177VjQY3U2GZvw==
+
 "@pinojs/redact@^0.4.0":
   version "0.4.0"
   resolved "https://registry.npmjs.org/@pinojs/redact/-/redact-0.4.0.tgz"

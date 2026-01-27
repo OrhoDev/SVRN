@@ -2,8 +2,10 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
-import { Barretenberg, Fr } from '@aztec/bb.js'; 
+import { Barretenberg, UltraHonkBackend, Fr } from '@aztec/bb.js'; // ✅ Import UltraHonkBackend
+import { Noir } from '@noir-lang/noir_js';
 import fs from 'fs';
+import path from 'path';
 import dotenv from 'dotenv';
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
@@ -12,6 +14,15 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// --- LOAD CIRCUITS ---
+const tallyCircuitPath = path.join(__dirname, 'tally.json');
+let tallyCircuit: any;
+try {
+    tallyCircuit = JSON.parse(fs.readFileSync(tallyCircuitPath, 'utf-8'));
+} catch (e) {
+    console.warn("⚠️ tally.json not found. Feature #2 will fail.");
+}
 
 const PORT = 3000;
 const RPC_URL = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
@@ -30,7 +41,7 @@ const SNAPSHOT_DB: Record<string, any> = {};
 
 console.log("🚀 SVRN Sovereign Relayer Online");
 
-// --- ZK KERNEL (Using Async Barretenberg for stability) ---
+// --- ZK KERNEL (Global instance for hashing) ---
 let bb: any;
 async function initZK() {
     console.log("   Initializing Barretenberg WASM (Async Mode)...");
@@ -40,11 +51,6 @@ async function initZK() {
 initZK();
 
 // --- NOIR-COMPATIBLE HASHING ---
-/**
- * Based on the Aztec Forum & Noir Tutorial:
- * Noir's pedersen_hash([a, b]) = Barretenberg's pedersenHash([a, b], 0)
- * We use the Fr class to ensure every input has the .toBuffer() method.
- */
 async function noirHash(input1: any, input2: any): Promise<Fr> {
     const toFr = (val: any) => {
         if (val instanceof Fr) return val;
@@ -56,12 +62,7 @@ async function noirHash(input1: any, input2: any): Promise<Fr> {
     const f1 = toFr(input1);
     const f2 = toFr(input2);
 
-    // Using the async Barretenberg instance
-    // inputs: Fr[]
-    // index: number (0 is default for Noir)
     const result = await bb.pedersenHash([f1, f2], 0);
-    
-    // Result is an Fr object or Buffer
     return (result instanceof Fr) ? result : Fr.fromBuffer(result);
 }
 
@@ -102,44 +103,52 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
 
         if (voters.length === 0) throw new Error("No token holders found.");
 
-        const leavesFr: Fr[] = [];
+        const leavesFr: Fr[] = []; 
         const voterMap: Record<string, any> = {};
 
-        // 1. Build Leaves (Sequential to avoid WASM concurrency issues)
+        console.log(`\n--- BUILDING QUADRATIC VOTING TREE ---`);
+
         for (let i = 0; i < voters.length; i++) {
             const v = voters[i];
             const secretVal = deriveSecret(v.owner);
-            const leaf = await noirHash(secretVal, v.balance);
+            
+            // Feature 1: Quadratic Weighting
+            const weight = Math.floor(Math.sqrt(v.balance));
+            
+            console.log(`   User: ${v.owner.slice(0,6)}... | Bal: ${v.balance} | Weight: ${weight}`);
+
+            const leaf = await noirHash(secretVal, weight);
             leavesFr.push(leaf);
 
             voterMap[v.owner] = { 
                 index: i, 
                 balance: v.balance, 
+                weight: weight,
                 secret: "0x" + secretVal.toString(16), 
                 leaf: leaf.toString() 
             };
         }
 
-        // 2. Pad Tree
         const zeroLeaf = await noirHash(0, 0);
         while (leavesFr.length < 8) leavesFr.push(zeroLeaf);
 
-        // 3. Build Tree
         const levels: string[][] = [leavesFr.map(f => f.toString())];
         let currentLevel: Fr[] = leavesFr;
+
         while (currentLevel.length > 1) {
-            const nextLevel: Fr[] = [];
+            const nextLevelFr: Fr[] = [];
             for (let i = 0; i < currentLevel.length; i += 2) {
-                nextLevel.push(await noirHash(currentLevel[i], currentLevel[i+1]));
+                const parent = await noirHash(currentLevel[i], currentLevel[i+1]);
+                nextLevelFr.push(parent);
             }
-            currentLevel = nextLevel;
+            currentLevel = nextLevelFr;
             levels.push(currentLevel.map(f => f.toString()));
         }
 
         const root = levels[levels.length - 1][0];
         SNAPSHOT_DB[propKey] = { root, voterMap, levels };
 
-        console.log(`📸 [SNAPSHOT] Prop #${propKey} | Root: ${root.slice(0, 16)}...`);
+        console.log(`📸 [SNAPSHOT] Prop #${propKey} | QV Root: ${root.slice(0, 16)}...`);
         res.json({ success: true, root, count: voters.length });
     } catch (e: any) {
         console.error("SNAPSHOT_ERROR:", e.message);
@@ -187,6 +196,46 @@ app.post('/relay-vote', async (req: Request, res: Response) => {
 
         res.json({ success: true, tx });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// --- FEATURE 2: ZK TALLY PROOF ENDPOINT ---
+app.post('/prove-tally', async (req: Request, res: Response) => {
+    try {
+        console.log("⚖️  Generating ZK Tally Proof...");
+        const { yesVotes, noVotes, threshold } = req.body;
+        
+        if (!tallyCircuit) throw new Error("Tally Circuit JSON not found.");
+
+        // 1. Instantiate the Backend SPECIFICALLY for this circuit
+        // As per docs: New Backend per circuit
+        const tallyBackend = new UltraHonkBackend(tallyCircuit.bytecode);
+        const noir = new Noir(tallyCircuit);
+        
+        // 2. Execute Circuit (Generate Witness)
+        const inputs = {
+            yes_votes: yesVotes,
+            no_votes: noVotes,
+            threshold_percent: threshold
+        };
+
+        const { witness } = await noir.execute(inputs);
+        
+        // 3. Generate Proof using the specialized backend
+        const proof = await tallyBackend.generateProof(witness);
+
+        const hexProof = Buffer.from(proof.proof).toString('hex');
+        console.log(`   ✅ Tally Proof Generated: ${hexProof.slice(0, 16)}...`);
+        
+        res.json({ 
+            success: true, 
+            proof: hexProof,
+            msg: "Majority integrity verified via ZK"
+        });
+
+    } catch (e: any) {
+        console.error("TALLY_PROOF_ERROR:", e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
 });
 
 app.listen(PORT, () => console.log(`📡 Relayer listening on http://localhost:${PORT}`));

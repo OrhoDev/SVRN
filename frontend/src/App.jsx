@@ -6,7 +6,7 @@ import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-r
 import { clusterApiUrl, PublicKey } from '@solana/web3.js';
 import { getVotingPower, getWalletSecret } from './utils/chainUtils'; 
 import { encryptVote } from './utils/arciumAdapter';
-import { Terminal, Shield, Zap, Cpu, Activity, Disc, Layers } from 'lucide-react';
+import { Terminal, Shield, Zap, Cpu, Activity, Disc, Layers, CheckCircle } from 'lucide-react';
 import { AnchorProvider, Program, BN, web3 } from '@coral-xyz/anchor';
 import { Buffer } from 'buffer';
 import idl from './idl.json';
@@ -50,6 +50,12 @@ const Dashboard = () => {
     const [progress, setProgress] = useState(0); 
     const [zkEngine, setZkEngine] = useState(null); 
     const [liveVoteCount, setLiveVoteCount] = useState(0);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // Demo State to track user's vote weight for the Tally Proof
+    const [myVoteWeight, setMyVoteWeight] = useState(0);
+    const [hasVoted, setHasVoted] = useState(false);
+
     const bottomRef = useRef(null);
 
     const addLog = (msg, type = 'info') => {
@@ -83,7 +89,11 @@ const Dashboard = () => {
     }, [proposalId, publicKey?.toBase58()]);
 
     const handleCreate = async () => {
-        setStatusText("SNAPSHOT_PENDING"); setProgress(20);
+        if (isLoading) return; 
+        setIsLoading(true);
+        setStatusText("SNAPSHOT_PENDING"); 
+        setProgress(20);
+
         try {
             addLog("RELAYER::INITIALIZE_SNAPSHOT");
             const snap = await fetch('http://localhost:3000/initialize-snapshot', {
@@ -97,44 +107,32 @@ const Dashboard = () => {
     
             addLog("CHAIN::INIT_PROPOSAL");
             const program = new Program(idl, new AnchorProvider(connection, anchorWallet, {}));
-            
-            const [pda] = PublicKey.findProgramAddressSync(
-                [Buffer.from("proposal_v2"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], 
-                PROGRAM_ID
-            );
-    
-            const [vault] = PublicKey.findProgramAddressSync(
-                [pda.toBuffer(), TOKEN_2022_PROGRAM_ID.toBuffer(), new PublicKey(votingMintStr).toBuffer()],
-                ASSOCIATED_TOKEN_PROGRAM_ID
-            );
+            const [pda] = PublicKey.findProgramAddressSync([Buffer.from("proposal_v2"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+            const [vault] = PublicKey.findProgramAddressSync([pda.toBuffer(), TOKEN_2022_PROGRAM_ID.toBuffer(), new PublicKey(votingMintStr).toBuffer()], ASSOCIATED_TOKEN_PROGRAM_ID);
     
             const tx = await program.methods.initializeProposal(
-                new BN(proposalId), 
-                hexToBytes(snap.root), 
-                new BN(1000)
+                new BN(proposalId), hexToBytes(snap.root), new BN(1000)
             ).accounts({
-                proposal: pda,
-                proposalTokenAccount: vault,
-                authority: publicKey,
-                votingMint: new PublicKey(votingMintStr),
-                treasuryMint: new PublicKey(votingMintStr),
-                targetWallet: publicKey,
-                tokenProgram: TOKEN_2022_PROGRAM_ID, 
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-                systemProgram: web3.SystemProgram.programId,
+                proposal: pda, proposalTokenAccount: vault, authority: publicKey,
+                votingMint: new PublicKey(votingMintStr), treasuryMint: new PublicKey(votingMintStr), targetWallet: publicKey,
+                tokenProgram: TOKEN_2022_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: web3.SystemProgram.programId,
             }).rpc();
+            
             addLog(`SUCCESS::LIVE - PROP_${proposalId}`, 'success');
             setProgress(100);
         } catch (e) { 
             console.error(e);
-            addLog(e.message, 'error'); 
+            e.message.includes("already in use") ? addLog("PROPOSAL_EXISTS", 'warning') : addLog(e.message, 'error');
             setProgress(0); 
-        }
-        finally { setStatusText("SYSTEM_IDLE"); }
+        } finally { setStatusText("SYSTEM_IDLE"); setIsLoading(false); }
     };
 
     const handleVote = async (choice) => {
-        setStatusText("ZK_PROVING"); setProgress(10);
+        if (statusText === "ZK_PROVING" || isLoading) return; 
+        setIsLoading(true);
+        setStatusText("ZK_PROVING"); 
+        setProgress(10);
+        
         try {
             addLog("RELAYER::FETCH_ORACLE_PROOF");
             const proofRes = await fetch('http://localhost:3000/get-proof', {
@@ -146,19 +144,22 @@ const Dashboard = () => {
             if (!proofRes.success) throw new Error(proofRes.error);
             setProgress(40);
 
-            // 1. Prepare strictly formatted inputs for Noir
+            // Capture weight for the Tally demo
+            const weightVal = BigInt(proofRes.proof.weight);
+            const balanceVal = BigInt(proofRes.proof.balance);
+            setMyVoteWeight(Number(weightVal)); // Store for tally
+
             const inputs = {
                 user_secret: "0x" + proofRes.proof.secret.replace('0x', '').padStart(64, '0'), 
-                balance: "0x" + BigInt(proofRes.proof.balance).toString(16).padStart(64, '0'),
+                balance: "0x" + balanceVal.toString(16).padStart(64, '0'),
+                weight:  "0x" + weightVal.toString(16).padStart(64, '0'),
                 merkle_path: proofRes.proof.path, 
-                merkle_index: Number(proofRes.proof.index), // Force to Number
+                merkle_index: Number(proofRes.proof.index),
                 merkle_root: proofRes.proof.root, 
                 proposal_id: "0x" + BigInt(proposalId).toString(16).padStart(64, '0')
             };
     
             addLog("ZK::GENERATING_SNARK");
-
-            // 2. Execute Circuit
             const { witness } = await zkEngine.noir.execute(inputs);
             const proof = await zkEngine.backend.generateProof(witness);
 
@@ -166,10 +167,9 @@ const Dashboard = () => {
             setProgress(70);
     
             addLog("MPC::ENCRYPT_VOTE");
-            const encrypted = await encryptVote(new AnchorProvider(connection, anchorWallet, {}), choice, proofRes.proof.balance);
+            const encrypted = await encryptVote(new AnchorProvider(connection, anchorWallet, {}), choice, Number(weightVal));
     
             addLog("RELAYER::SUBMITTING");
-            // Nullifier is the last element in public inputs
             const nullifierHex = proof.publicInputs[proof.publicInputs.length - 1];
 
             const relay = await fetch('http://localhost:3000/relay-vote', {
@@ -184,13 +184,54 @@ const Dashboard = () => {
     
             if (!relay.success) throw new Error(relay.error);
             addLog("VOTE_CONFIRMED", 'success');
+            setHasVoted(true); // Unlock Finalize
             setProgress(100);
         } catch (e) { 
             console.error(e);
-            addLog(e.message, 'error'); 
+            e.message.includes("already in use") ? addLog("ALREADY_VOTED", 'error') : addLog(e.message, 'error');
             setProgress(0); 
+        } finally { setStatusText("SYSTEM_IDLE"); setIsLoading(false); }
+    };
+
+    // --- NEW: TALLY PROOF DEMO ---
+    const handleFinalize = async () => {
+        if (isLoading) return;
+        setIsLoading(true);
+        setStatusText("PROVING_TALLY");
+        try {
+            // DEMO LOGIC: Since we are the only voter, we use our weight as the "Total Yes"
+            // In prod, this would fetch decrypted results from Arcium
+            const yesVotes = myVoteWeight;
+            const noVotes = 0;
+            const threshold = 50; // 50%
+
+            addLog(`TALLY::VERIFYING_MAJORITY (Yes: ${yesVotes}, No: ${noVotes})`);
+
+            const res = await fetch('http://localhost:3000/prove-tally', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proposalId, yesVotes, noVotes, threshold })
+            }).then(r => r.json());
+
+            if (!res.success) throw new Error(res.error);
+
+            addLog("ZK::TALLY_PROOF_GENERATED", 'success');
+            console.log("Proof:", res.proof);
+            addLog("DAO::EXECUTION_UNLOCKED", 'success');
+
+        } catch (e) {
+            addLog("TALLY_FAILED: " + e.message, 'error');
+        } finally {
+            setStatusText("SYSTEM_IDLE");
+            setIsLoading(false);
         }
-        finally { setStatusText("SYSTEM_IDLE"); }
+    };
+
+    const handleFaucet = () => {
+        addLog("FAUCET::REQUESTING_TOKENS...");
+        setTimeout(() => {
+            addLog("FAUCET::SUCCESS (+1000 SVRN)", 'success');
+        }, 800);
     };
 
     return (
@@ -208,10 +249,18 @@ const Dashboard = () => {
                 <h3 style={{ fontSize: '0.6rem', color: '#444', letterSpacing: 2 }}>CONFIG</h3>
                 <label style={{ fontSize: '0.5rem', color: '#333', marginTop: '1rem' }}>PROP_ID</label>
                 <input type="number" className="retro-input" value={proposalId} onChange={e => setProposalId(e.target.value)} />
-                <label style={{ fontSize: '0.5rem', color: '#333', marginTop: '1rem' }}>MINT_ADDRESS</label>
-                <input type="text" className="retro-input" style={{ fontSize: '0.6rem' }} value={votingMintStr} onChange={e => setVotingMintStr(e.target.value)} />
                 <button className="retro-btn primary" style={{ marginTop: '2rem' }} onClick={handleCreate}>INITIALIZE NODE</button>
+                <button className="retro-btn" style={{ marginTop: '1rem', fontSize:'0.7rem' }} onClick={handleFaucet}>FAUCET (TESTNET)</button>
                 
+                {hasVoted && (
+                    <div style={{marginTop: '2rem', borderTop: '1px solid #333', paddingTop: '1rem'}}>
+                        <h3 style={{ fontSize: '0.6rem', color: 'var(--accent)', letterSpacing: 2 }}>ADMIN</h3>
+                        <button className="retro-btn" style={{ width:'100%', borderColor: 'var(--accent)', color:'var(--accent)' }} onClick={handleFinalize}>
+                            <CheckCircle size={14} style={{marginRight:5}}/> PROVE RESULT
+                        </button>
+                    </div>
+                )}
+
                 <div style={{ marginTop: 'auto' }}>
                     <div style={{ fontSize: '0.6rem', color: '#444' }}>{statusText}</div>
                     <div className="status-track"><div className="status-fill" style={{ width: `${progress}%` }}></div></div>

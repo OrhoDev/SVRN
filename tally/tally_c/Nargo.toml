@@ -1,0 +1,6 @@
+[package]
+name = "tally_c"
+type = "bin"
+authors = [""]
+
+[dependencies]
