@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
-import react from '@vitejs/plugin-react'; // <--- ADDED
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite'; // <--- ADDED
 
 export default defineConfig({
   plugins: [
-    react(), // <--- ADDED
+    react(),
+    tailwindcss(),
     nodePolyfills({
       globals: {
         Buffer: true,

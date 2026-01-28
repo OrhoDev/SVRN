@@ -2,10 +2,11 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
-import { Barretenberg, UltraHonkBackend, Fr } from '@aztec/bb.js'; // ✅ Import UltraHonkBackend
+import { Barretenberg, UltraHonkBackend, Fr } from '@aztec/bb.js'; 
 import { Noir } from '@noir-lang/noir_js';
 import fs from 'fs';
-import path from 'path';
+import path from 'path'; 
+import bs58 from 'bs58';
 import dotenv from 'dotenv';
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
@@ -15,13 +16,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- LOAD CIRCUITS ---
+// --- LOAD TALLY CIRCUIT ---
 const tallyCircuitPath = path.join(__dirname, 'tally.json');
 let tallyCircuit: any;
 try {
     tallyCircuit = JSON.parse(fs.readFileSync(tallyCircuitPath, 'utf-8'));
 } catch (e) {
-    console.warn("⚠️ tally.json not found. Feature #2 will fail.");
+    console.warn("⚠️ tally.json not found. Run 'nargo compile' and copy the json file.");
 }
 
 const PORT = 3000;
@@ -41,7 +42,7 @@ const SNAPSHOT_DB: Record<string, any> = {};
 
 console.log("🚀 SVRN Sovereign Relayer Online");
 
-// --- ZK KERNEL (Global instance for hashing) ---
+// --- ZK KERNEL ---
 let bb: any;
 async function initZK() {
     console.log("   Initializing Barretenberg WASM (Async Mode)...");
@@ -78,7 +79,7 @@ function deriveSecret(pubkeyStr: string): bigint {
 }
 
 // ==========================================
-// SNAPSHOT & MERKLE LOGIC
+// 1. SNAPSHOT & MERKLE LOGIC (Quadratic)
 // ==========================================
 
 app.post('/initialize-snapshot', async (req: Request, res: Response) => {
@@ -106,13 +107,13 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
         const leavesFr: Fr[] = []; 
         const voterMap: Record<string, any> = {};
 
-        console.log(`\n--- BUILDING QUADRATIC VOTING TREE ---`);
+        console.log(`\n--- BUILDING QUADRATIC VOTING TREE (Prop #${propKey}) ---`);
 
         for (let i = 0; i < voters.length; i++) {
             const v = voters[i];
             const secretVal = deriveSecret(v.owner);
             
-            // Feature 1: Quadratic Weighting
+            // Feature 1: Quadratic Weighting (Square Root)
             const weight = Math.floor(Math.sqrt(v.balance));
             
             console.log(`   User: ${v.owner.slice(0,6)}... | Bal: ${v.balance} | Weight: ${weight}`);
@@ -148,13 +149,17 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
         const root = levels[levels.length - 1][0];
         SNAPSHOT_DB[propKey] = { root, voterMap, levels };
 
-        console.log(`📸 [SNAPSHOT] Prop #${propKey} | QV Root: ${root.slice(0, 16)}...`);
+        console.log(`📸 Snapshot Built. Root: ${root.slice(0, 16)}...`);
         res.json({ success: true, root, count: voters.length });
     } catch (e: any) {
         console.error("SNAPSHOT_ERROR:", e.message);
         res.status(500).json({ success: false, error: e.message });
     }
 });
+
+// ==========================================
+// 2. PROOF GENERATION (Voting)
+// ==========================================
 
 app.post('/get-proof', (req: Request, res: Response) => {
     try {
@@ -171,9 +176,16 @@ app.post('/get-proof', (req: Request, res: Response) => {
             path.push(snap.levels[i][siblingIdx]);
             currIdx = Math.floor(currIdx / 2);
         }
-        res.json({ success: true, proof: { ...voter, path, root: snap.root } });
+        const proof = { ...voter, path, root: snap.root };
+        console.log(`🔍 Proof requested - proposal=${proposalId} user=${userPubkey} index=${voter.index} root=${snap.root.slice(0,16)}...`);
+        console.log(`       Proof.path: [${path.map(p=>p.slice(0,8)).join(', ')}]`);
+        res.json({ success: true, proof });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
+
+// ==========================================
+// 3. VOTING (Solana Interaction)
+// ==========================================
 
 app.post('/relay-vote', async (req: Request, res: Response) => {
     try {
@@ -181,6 +193,19 @@ app.post('/relay-vote', async (req: Request, res: Response) => {
         const proposalBn = new anchor.BN(proposalId);
         const [proposalPda] = PublicKey.findProgramAddressSync([Buffer.from("proposal_v2"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
         const [nullifierPda] = PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
+
+        // Helpful debug prints for explorer verification
+        try {
+            const nullifierBuf = Buffer.from(nullifier);
+            console.log(`🔐 Relay Vote - proposal=${proposalId}`);
+            console.log(`   proposalPda: ${proposalPda.toBase58()}`);
+            console.log(`   nullifierPda: ${nullifierPda.toBase58()}`);
+            console.log(`   nullifier (hex): ${nullifierBuf.toString('hex').slice(0,64)}...`);
+            console.log(`   nullifier (bs58): ${bs58.encode(nullifierBuf)}`);
+            console.log(`   ciphertext length: ${Buffer.from(ciphertext).length} bytes`);
+        } catch (logErr) {
+            console.warn('Could not print debug info for nullifier/ciphertext', logErr);
+        }
 
         const tx = await program.methods.submitVote(
             [...Buffer.from(nullifier)], 
@@ -194,42 +219,54 @@ app.post('/relay-vote', async (req: Request, res: Response) => {
             systemProgram: anchor.web3.SystemProgram.programId 
         }).signers([relayerWallet]).rpc();
 
+        // Print the returned signature + explorer link to make verification trivial
+        try {
+            console.log(`✅ Vote relayed. tx: ${tx}`);
+            console.log(`   Explorer (devnet): https://explorer.solana.com/tx/${tx}?cluster=devnet`);
+            console.log(`   Check nullifier account: https://explorer.solana.com/address/${nullifierPda.toBase58()}?cluster=devnet`);
+        } catch (logErr) { console.warn('Could not print tx explorer link', logErr); }
+
         res.json({ success: true, tx });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
-// --- FEATURE 2: ZK TALLY PROOF ENDPOINT ---
+// ==========================================
+// 4. FEATURE 2: ZK TALLY PROOF (Finalization)
+// ==========================================
+
 app.post('/prove-tally', async (req: Request, res: Response) => {
     try {
         console.log("⚖️  Generating ZK Tally Proof...");
-        const { yesVotes, noVotes, threshold } = req.body;
         
         if (!tallyCircuit) throw new Error("Tally Circuit JSON not found.");
-
-        // 1. Instantiate the Backend SPECIFICALLY for this circuit
-        // As per docs: New Backend per circuit
+        
+        // 1. Inputs required by tally_circuit/src/main.nr
+        const { yesVotes, noVotes, threshold, quorum } = req.body;
+        
+        // 2. Setup Dedicated Backend for Tally Circuit
         const tallyBackend = new UltraHonkBackend(tallyCircuit.bytecode);
         const noir = new Noir(tallyCircuit);
         
-        // 2. Execute Circuit (Generate Witness)
+        // 3. Execute Circuit (Inputs must match main.nr EXACTLY)
         const inputs = {
             yes_votes: yesVotes,
             no_votes: noVotes,
-            threshold_percent: threshold
+            majority_threshold_percent: threshold,
+            quorum_requirement: quorum
         };
 
         const { witness } = await noir.execute(inputs);
         
-        // 3. Generate Proof using the specialized backend
+        // 4. Generate Proof
         const proof = await tallyBackend.generateProof(witness);
-
         const hexProof = Buffer.from(proof.proof).toString('hex');
-        console.log(`   ✅ Tally Proof Generated: ${hexProof.slice(0, 16)}...`);
+        
+        console.log(`   ✅ Tally Proof Generated! Length: ${hexProof.length} chars`);
         
         res.json({ 
             success: true, 
             proof: hexProof,
-            msg: "Majority integrity verified via ZK"
+            msg: "Majority & Quorum verified via ZK"
         });
 
     } catch (e: any) {

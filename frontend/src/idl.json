@@ -8,16 +8,16 @@
   },
   "instructions": [
     {
-      "name": "finalize_execution",
+      "name": "finalize_proposal",
       "discriminator": [
-        204,
-        146,
-        126,
-        8,
-        192,
-        189,
-        127,
-        166
+        23,
+        68,
+        51,
+        167,
+        109,
+        173,
+        187,
+        164
       ],
       "accounts": [
         {
@@ -230,10 +230,16 @@
           }
         },
         {
-          "name": "target_wallet"
+          "name": "target_wallet",
+          "relations": [
+            "proposal"
+          ]
         },
         {
-          "name": "treasury_mint"
+          "name": "treasury_mint",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "authority",
@@ -246,7 +252,28 @@
           "name": "token_program"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "proof",
+          "type": "bytes"
+        },
+        {
+          "name": "yes_votes",
+          "type": "u64"
+        },
+        {
+          "name": "no_votes",
+          "type": "u64"
+        },
+        {
+          "name": "threshold",
+          "type": "u64"
+        },
+        {
+          "name": "quorum",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "initialize_proposal",
@@ -426,38 +453,6 @@
       ]
     },
     {
-      "name": "set_tally",
-      "discriminator": [
-        143,
-        23,
-        13,
-        225,
-        158,
-        93,
-        36,
-        61
-      ],
-      "accounts": [
-        {
-          "name": "proposal",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "signer": true,
-          "relations": [
-            "proposal"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "result",
-          "type": "u8"
-        }
-      ]
-    },
-    {
       "name": "submit_vote",
       "discriminator": [
         115,
@@ -581,7 +576,22 @@
     {
       "code": 6001,
       "name": "ProposalNotPassed",
-      "msg": "Proposal did not pass."
+      "msg": "Proposal did not pass (State)."
+    },
+    {
+      "code": 6002,
+      "name": "InvalidProof",
+      "msg": "Invalid ZK Proof."
+    },
+    {
+      "code": 6003,
+      "name": "QuorumNotMet",
+      "msg": "Quorum not met."
+    },
+    {
+      "code": 6004,
+      "name": "MajorityNotMet",
+      "msg": "Majority threshold not met."
     }
   ],
   "types": [

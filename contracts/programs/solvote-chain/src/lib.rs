@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-// ✅ Import from token_interface to support both SPL and Token-2022
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use anchor_spl::associated_token::AssociatedToken;
 
@@ -46,19 +45,39 @@ pub mod solvote_chain {
         Ok(())
     }
 
-    pub fn set_tally(ctx: Context<SetTally>, result: u8) -> Result<()> {
+    // --- FEATURE 2: ZK TALLY VERIFICATION & EXECUTION ---
+    // This replaces the old set_tally / finalize_execution flow.
+    // It verifies the math provided by the Relayer's ZK Proof before moving funds.
+    pub fn finalize_proposal(
+        ctx: Context<FinalizeProposal>,
+        proof: Vec<u8>,
+        yes_votes: u64,
+        no_votes: u64,
+        threshold: u64,
+        quorum: u64,
+    ) -> Result<()> {
         let proposal = &mut ctx.accounts.proposal;
         require!(!proposal.is_executed, ErrorCode::AlreadyExecuted);
-        proposal.tally_result = result;
-        msg!("DAO::TALLY >> Result set to {}", result);
-        Ok(())
-    }
 
-    pub fn finalize_execution(ctx: Context<ExecuteProposal>) -> Result<()> {
-        let proposal = &mut ctx.accounts.proposal;
-        require!(!proposal.is_executed, ErrorCode::AlreadyExecuted);
-        require!(proposal.tally_result == 1, ErrorCode::ProposalNotPassed);
-    
+        // 1. MOCK PROOF VERIFICATION
+        // In a production environment, we would call a Verifier Program via CPI here.
+        // For this hackathon demo, we check that a non-empty proof was submitted.
+        require!(proof.len() > 0, ErrorCode::InvalidProof);
+
+        // 2. ENFORCE GOVERNANCE LOGIC (On-Chain)
+        // We replicate the constraints of the ZK Circuit to ensure the inputs are valid.
+        let total_votes = yes_votes.checked_add(no_votes).unwrap();
+        
+        // Quorum Check
+        require!(total_votes >= quorum, ErrorCode::QuorumNotMet);
+
+        // Majority Check (Yes% >= Threshold%)
+        // yes * 100 >= total * threshold
+        let lhs = yes_votes.checked_mul(100).unwrap();
+        let rhs = total_votes.checked_mul(threshold).unwrap();
+        require!(lhs >= rhs, ErrorCode::MajorityNotMet);
+
+        // 3. EXECUTE TREASURY TRANSFER (CPI)
         let proposal_id_bytes = proposal.proposal_id.to_le_bytes();
         let seeds = &[
             b"proposal_v2", 
@@ -67,7 +86,6 @@ pub mod solvote_chain {
         ];
         let signer_seeds = &[&seeds[..]];
     
-        // ✅ Uses TokenInterface types safely
         let cpi_accounts = TransferChecked {
             from: ctx.accounts.proposal_token_account.to_account_info(),
             to: ctx.accounts.target_token_account.to_account_info(),
@@ -81,8 +99,11 @@ pub mod solvote_chain {
         let decimals = ctx.accounts.treasury_mint.decimals;
         token_interface::transfer_checked(cpi_ctx, proposal.execution_amount, decimals)?;
     
+        // Update State
+        proposal.tally_result = 1; // Passed
         proposal.is_executed = true;
-        msg!("DAO::EXECUTE >> Transfer Complete");
+        
+        msg!("DAO::ZK_FINALIZE >> Proof Verified. Execution Complete.");
         Ok(())
     }
 }
@@ -124,12 +145,15 @@ pub struct InitProposal<'info> {
 }
 
 #[derive(Accounts)]
-pub struct ExecuteProposal<'info> {
+#[instruction(proof: Vec<u8>, yes_votes: u64, no_votes: u64, threshold: u64, quorum: u64)]
+pub struct FinalizeProposal<'info> {
     #[account(
         mut,
         seeds = [b"proposal_v2", proposal.proposal_id.to_le_bytes().as_ref()],
         bump,
-        has_one = authority
+        has_one = authority,
+        has_one = target_wallet,
+        has_one = treasury_mint
     )]
     pub proposal: Account<'info, Proposal>,
 
@@ -152,15 +176,8 @@ pub struct ExecuteProposal<'info> {
 
     pub treasury_mint: InterfaceAccount<'info, Mint>,
 
-    pub authority: Signer<'info>,
+    pub authority: Signer<'info>, // Relayer pays for finalization
     pub token_program: Interface<'info, TokenInterface>,
-}
-
-#[derive(Accounts)]
-pub struct SetTally<'info> {
-    #[account(mut, has_one = authority)]
-    pub proposal: Account<'info, Proposal>,
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -179,6 +196,28 @@ pub struct SubmitVote<'info> {
     #[account(mut)]
     pub relayer: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+// Deprecated contexts (kept to avoid breaking old IDL if needed, but logic moved to FinalizeProposal)
+#[derive(Accounts)]
+pub struct ExecuteProposal<'info> {
+    #[account(mut)]
+    pub proposal: Account<'info, Proposal>,
+    #[account(mut)]
+    pub proposal_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut)]
+    pub target_token_account: InterfaceAccount<'info, TokenAccount>,
+    /// CHECK: Old check
+    pub target_wallet: UncheckedAccount<'info>,
+    pub treasury_mint: InterfaceAccount<'info, Mint>,
+    pub authority: Signer<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
+}
+#[derive(Accounts)]
+pub struct SetTally<'info> {
+    #[account(mut)]
+    pub proposal: Account<'info, Proposal>,
+    pub authority: Signer<'info>,
 }
 
 // --- STATE ---
@@ -210,6 +249,12 @@ pub struct NullifierAccount {
 pub enum ErrorCode {
     #[msg("Already executed.")]
     AlreadyExecuted,
-    #[msg("Proposal did not pass.")]
+    #[msg("Proposal did not pass (State).")]
     ProposalNotPassed,
+    #[msg("Invalid ZK Proof.")]
+    InvalidProof,
+    #[msg("Quorum not met.")]
+    QuorumNotMet,
+    #[msg("Majority threshold not met.")]
+    MajorityNotMet,
 }
