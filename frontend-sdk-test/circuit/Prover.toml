@@ -1,0 +1,6 @@
+balance = ""
+merkle_index = ""
+merkle_path = ["", "", ""]
+merkle_root = ""
+proposal_id = ""
+user_secret = ""

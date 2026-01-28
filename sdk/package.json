@@ -1,0 +1,33 @@
+{
+  "name": "svrn-sdk",
+  "version": "1.0.0",
+  "description": "SVRN Governance SDK",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@arcium-hq/client": "^0.6.2",
+    "@aztec/bb.js": "3.0.0-nightly.20260102",
+    "@coral-xyz/anchor": "^0.32.1",
+    "@noir-lang/noir_js": "1.0.0-beta.15",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.95.0",
+    "bn.js": "^5.2.2",
+    "buffer": "^6.0.3"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.2.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.3"
+  }
+}

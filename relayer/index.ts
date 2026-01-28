@@ -79,13 +79,38 @@ function deriveSecret(pubkeyStr: string): bigint {
 }
 
 // ==========================================
+// 0. NEW: INFO ROUTES (Fixes SDK 404s)
+// ==========================================
+
+// Fixes: "Unexpected token <" when SDK calls getNextProposalId
+app.get('/next-proposal-id', (req: Request, res: Response) => {
+    // Determine next ID based on keys in memory (or default to 1)
+    const ids = Object.keys(SNAPSHOT_DB).map(Number).filter(n => !isNaN(n));
+    const nextId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+    res.json({ success: true, nextId });
+});
+
+// Fixes: SDK ability to fetch proposal details
+app.get('/proposal/:id', (req: Request, res: Response) => {
+    const proposalId = req.params.id as string; // Explicitly cast to string
+    const snap = SNAPSHOT_DB[proposalId];
+    
+    if (!snap) {
+        return res.status(404).json({ success: false, error: "Proposal not found" });
+    }
+    
+    res.json({ success: true, proposal: snap });
+});
+// ==========================================
 // 1. SNAPSHOT & MERKLE LOGIC (Quadratic)
 // ==========================================
 
 app.post('/initialize-snapshot', async (req: Request, res: Response) => {
     try {
         if (!bb) return res.status(503).json({ error: "ZK Backend initializing..." });
-        const { votingMint, proposalId } = req.body;
+        
+        // UPDATED: Now destructuring metadata to save it
+        const { votingMint, proposalId, metadata } = req.body;
         const propKey = proposalId.toString(); 
 
         const response = await fetch(RPC_URL, {
@@ -147,7 +172,9 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
         }
 
         const root = levels[levels.length - 1][0];
-        SNAPSHOT_DB[propKey] = { root, voterMap, levels };
+        
+        // UPDATED: Now saving metadata into the DB
+        SNAPSHOT_DB[propKey] = { root, voterMap, levels, metadata: metadata || {} };
 
         console.log(`📸 Snapshot Built. Root: ${root.slice(0, 16)}...`);
         res.json({ success: true, root, count: voters.length });
