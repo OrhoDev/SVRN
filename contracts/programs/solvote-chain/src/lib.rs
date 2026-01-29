@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use anchor_spl::associated_token::AssociatedToken;
 
-declare_id!("Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU"); 
+declare_id!("2RX9HvFrhMFo7umHzcKHHzy298PA56v3K7hJgEEv5wCX"); 
 
 #[program]
 pub mod solvote_chain {
@@ -80,7 +80,7 @@ pub mod solvote_chain {
         // 3. EXECUTE TREASURY TRANSFER (CPI)
         let proposal_id_bytes = proposal.proposal_id.to_le_bytes();
         let seeds = &[
-            b"proposal_v2", 
+            b"svrn_prop", 
             proposal_id_bytes.as_ref(),
             &[ctx.bumps.proposal],
         ];
@@ -117,7 +117,7 @@ pub struct InitProposal<'info> {
         init,
         payer = authority,
         space = 8 + 8 + 8 + 32 + 32 + 32 + 8 + 32 + 32 + 32 + 1 + 1 + 64,
-        seeds = [b"proposal_v2", proposal_id.to_le_bytes().as_ref()],
+        seeds = [b"svrn_prop", proposal_id.to_le_bytes().as_ref()],
         bump
     )]
     pub proposal: Account<'info, Proposal>,
@@ -126,7 +126,8 @@ pub struct InitProposal<'info> {
         init,
         payer = authority,
         associated_token::mint = treasury_mint,
-        associated_token::authority = proposal
+        associated_token::authority = proposal,
+        associated_token::token_program = token_program
     )]
     pub proposal_token_account: InterfaceAccount<'info, TokenAccount>, 
 
@@ -149,7 +150,7 @@ pub struct InitProposal<'info> {
 pub struct FinalizeProposal<'info> {
     #[account(
         mut,
-        seeds = [b"proposal_v2", proposal.proposal_id.to_le_bytes().as_ref()],
+        seeds = [b"svrn_prop", proposal.proposal_id.to_le_bytes().as_ref()],
         bump,
         has_one = authority,
         has_one = target_wallet,

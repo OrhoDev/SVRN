@@ -197,7 +197,7 @@ const Dashboard = () => {
         const fetchCount = async () => {
             try {
                 // Using SDK logic for address derivation to match
-                const [pda] = PublicKey.findProgramAddressSync([Buffer.from("proposal_v2"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+                const [pda] = PublicKey.findProgramAddressSync([Buffer.from("svrn_prop"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
                 const program = new Program(idl, new AnchorProvider(connection, anchorWallet || { publicKey }, {}));
                 const acc = await program.account.proposal.fetch(pda);
                 setLiveVoteCount(acc.voteCount.toNumber());

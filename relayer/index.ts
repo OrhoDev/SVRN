@@ -9,6 +9,7 @@ import path from 'path';
 import bs58 from 'bs58';
 import dotenv from 'dotenv';
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { BN } from 'bn.js';
 
 dotenv.config();
 
@@ -78,16 +79,77 @@ function deriveSecret(pubkeyStr: string): bigint {
     return hash;
 }
 
+// Helper function to get highest proposal ID from on-chain accounts
+async function getHighestProposalId(): Promise<number> {
+    try {
+        // Get all program accounts (no filters to avoid RPC issues)
+        const programAccounts = await connection.getProgramAccounts(PROGRAM_ID);
+        
+        let maxId = 0;
+        for (const account of programAccounts) {
+            try {
+                // Check if this account data looks like a proposal account
+                // Proposal accounts start with proposal_id (8 bytes)
+                if (account.account.data.length >= 8) {
+                    const proposalIdBytes = account.account.data.slice(0, 8);
+                    const proposalId = new BN(proposalIdBytes, 'le').toNumber();
+                    
+                    // Sanity check: proposal ID should be reasonable
+                    if (proposalId > 0 && proposalId < 1000000) {
+                        if (proposalId > maxId) {
+                            maxId = proposalId;
+                        }
+                    }
+                }
+            } catch (e) {
+                // Skip accounts that don't match our expected structure
+                continue;
+            }
+        }
+        
+        console.log(`Found highest on-chain proposal ID: ${maxId} from ${programAccounts.length} accounts`);
+        return maxId;
+    } catch (error) {
+        console.warn('Error fetching on-chain proposal IDs:', error);
+        return 0; // Default to 0 if we can't fetch
+    }
+}
+
 // ==========================================
 // 0. NEW: INFO ROUTES (Fixes SDK 404s)
 // ==========================================
 
 // Fixes: "Unexpected token <" when SDK calls getNextProposalId
-app.get('/next-proposal-id', (req: Request, res: Response) => {
-    // Determine next ID based on keys in memory (or default to 1)
-    const ids = Object.keys(SNAPSHOT_DB).map(Number).filter(n => !isNaN(n));
-    const nextId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
-    res.json({ success: true, nextId });
+app.get('/next-proposal-id', async (req: Request, res: Response) => {
+    try {
+        // Get highest proposal ID from on-chain accounts
+        const highestOnChainId = await getHighestProposalId();
+        
+        // Also check in-memory database for any proposals not yet on-chain
+        const memoryIds = Object.keys(SNAPSHOT_DB).map(Number).filter(n => !isNaN(n));
+        const highestMemoryId = memoryIds.length > 0 ? Math.max(...memoryIds) : 0;
+        
+        // Use the higher of the two sources
+        const highestId = Math.max(highestOnChainId, highestMemoryId);
+        const nextId = highestId + 1;
+        
+        console.log(`Next proposal ID: ${nextId} (on-chain: ${highestOnChainId}, memory: ${highestMemoryId})`);
+        res.json({ success: true, nextId });
+    } catch (error) {
+        console.error('Error getting next proposal ID:', error);
+        // Fallback to memory-based logic
+        const ids = Object.keys(SNAPSHOT_DB).map(Number).filter(n => !isNaN(n));
+        const nextId = ids.length > 0 ? Math.max(...ids) + 1 : 2005;
+        res.json({ success: true, nextId });
+    }
+});
+
+// Admin endpoint to reset proposal ID counter
+app.post('/admin/reset-proposals', (req: Request, res: Response) => {
+    // Clear the snapshot database to reset proposal IDs
+    Object.keys(SNAPSHOT_DB).forEach(key => delete SNAPSHOT_DB[key]);
+    console.log("🔄 Proposal database reset - all proposal IDs cleared");
+    res.json({ success: true, message: "Proposal database reset successfully" });
 });
 
 // Fixes: SDK ability to fetch proposal details
@@ -218,7 +280,7 @@ app.post('/relay-vote', async (req: Request, res: Response) => {
     try {
         const { nullifier, ciphertext, pubkey, nonce, proposalId } = req.body;
         const proposalBn = new anchor.BN(proposalId);
-        const [proposalPda] = PublicKey.findProgramAddressSync([Buffer.from("proposal_v2"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+        const [proposalPda] = PublicKey.findProgramAddressSync([Buffer.from("svrn_prop"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
         const [nullifierPda] = PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
 
         // Helpful debug prints for explorer verification

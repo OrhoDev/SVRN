@@ -50,7 +50,7 @@ export class SvrnClient {
 
         // 3. Build On-Chain TX (Anchor/Solana Logic)
         const program = new Program(idl as any, provider);
-        const [pda] = PublicKey.findProgramAddressSync([Buffer.from("proposal_v2"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+        const [pda, bump] = PublicKey.findProgramAddressSync([Buffer.from("svrn_prop"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
         const [vault] = PublicKey.findProgramAddressSync([pda.toBuffer(), TOKEN_2022_PROGRAM_ID.toBuffer(), new PublicKey(votingMint).toBuffer()], ASSOCIATED_TOKEN_PROGRAM_ID);
         
         // CHANGE 4: web3.SystemProgram becomes simply SystemProgram (imported above)
@@ -109,6 +109,6 @@ export class SvrnClient {
         
         // The API call returns the relayer's response which should include the tx signature
         const relayResponse = await this.api.submitVote(proposalId, nullifier, encrypted);
-        return { success: relayResponse.success, tx: relayResponse.signature, error: relayResponse.error };
+        return { success: relayResponse.success, tx: relayResponse.tx, error: relayResponse.error };
     }
 }

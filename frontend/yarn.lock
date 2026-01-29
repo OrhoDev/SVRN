@@ -9013,7 +9013,7 @@ __metadata:
 
 "svrn-sdk@file:../sdk::locator=browser_example%40workspace%3A.":
   version: 1.0.0
-  resolution: "svrn-sdk@file:../sdk#../sdk::hash=4e0b90&locator=browser_example%40workspace%3A."
+  resolution: "svrn-sdk@file:../sdk#../sdk::hash=9303b5&locator=browser_example%40workspace%3A."
   dependencies:
     "@arcium-hq/client": "npm:^0.6.2"
     "@aztec/bb.js": "npm:3.0.0-nightly.20260102"
@@ -9021,9 +9021,9 @@ __metadata:
     "@noir-lang/noir_js": "npm:1.0.0-beta.15"
     "@solana/spl-token": "npm:^0.4.14"
     "@solana/web3.js": "npm:^1.95.0"
-    bn.js: "npm:^5.2.1"
+    bn.js: "npm:^5.2.2"
     buffer: "npm:^6.0.3"
-  checksum: 10c0/c8a9230fcff8b088ae8a7390004ba03d6ab0d61a9c301a82c1763a5d6e295d2b1caa6de6289998073a53dfb6ebbacb6adfbce35d5e0b2983a84234d4f4512610
+  checksum: 10c0/a51a9c6c380798b91b0331048be8ea476524c7aff4a53d5efc4ad1416168c9ba173ac891a6eecbb765af16c66642417a8a14d34d85d33957928bf4ba301c3a2f
   languageName: node
   linkType: hard
 
