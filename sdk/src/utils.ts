@@ -2,6 +2,7 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
 
 export const SYSTEM_PROGRAM_ID = new PublicKey("11111111111111111111111111111111");
+const LEGACY_TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
 export const hexToBytes = (hex: string): number[] => {
     let cleanHex = hex.startsWith("0x") ? hex.slice(2) : hex;
@@ -17,11 +18,15 @@ export const toHex = (val: string | number | bigint): string => {
 };
 
 export async function getWalletSecret(walletPubkey: string, proposalId: number | string): Promise<string> {
-    // Derive secret from pubkey + proposalId (no wallet signing required)
-    const message = new TextEncoder().encode(`SVRN_SECRET_${walletPubkey}_P${proposalId}`);
-    const hash = await crypto.subtle.digest('SHA-256', message);
-    const hashArray = Array.from(new Uint8Array(hash)).slice(0, 31);
-    return '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    // Matches Relayer 'deriveSecret' logic
+    const buffer = new TextEncoder().encode(walletPubkey);
+    let hash = 0n;
+    const MOD = BigInt("0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001");
+    for (const byte of buffer) {
+        hash = (hash << 8n) + BigInt(byte);
+        hash = hash % MOD;
+    }
+    return "0x" + hash.toString(16);
 }
 
 export async function getVotingPower(connection: Connection, walletPubkey: PublicKey, votingMint: PublicKey): Promise<number> {
@@ -30,8 +35,15 @@ export async function getVotingPower(connection: Connection, walletPubkey: Publi
             const lamports = await connection.getBalance(walletPubkey);
             return Math.floor(lamports / LAMPORTS_PER_SOL);
         }
-        const tokenAccount = await getAssociatedTokenAddress(votingMint, walletPubkey);
-        const accountInfo = await getAccount(connection, tokenAccount);
+        
+        // STRICT LEGACY CHECK
+        const tokenAccount = await getAssociatedTokenAddress(
+            votingMint, 
+            walletPubkey, 
+            false, 
+            LEGACY_TOKEN_PROGRAM_ID
+        );
+        const accountInfo = await getAccount(connection, tokenAccount, "confirmed", LEGACY_TOKEN_PROGRAM_ID);
         return Number(accountInfo.amount);
     } catch (e) {
         return 0;

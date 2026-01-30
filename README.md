@@ -19,7 +19,7 @@ SVRN is composed of four primary components.
 The on-chain program is responsible for proposal initialization, vote submission, and verification of zero-knowledge proofs. All votes stored on-chain are encrypted, and the contract never observes plaintext votes or voter identities.
 
 Program ID
-Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU
+2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg
 
 ### 2. Relayer Middleware
 

@@ -13,11 +13,12 @@
     }
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsup",
+    "dev": "tsup --watch"
   },
   "dependencies": {
     "@arcium-hq/client": "^0.6.2",
-    "@aztec/bb.js": "3.0.0-nightly.20260102",
+    "@aztec/bb.js": "^3.0.0-nightly.20260102",
     "@coral-xyz/anchor": "^0.32.1",
     "@noir-lang/noir_js": "1.0.0-beta.15",
     "@solana/spl-token": "^0.4.14",
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@types/bn.js": "^5.2.0",
     "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
     "typescript": "^5.3.3"
   }
 }

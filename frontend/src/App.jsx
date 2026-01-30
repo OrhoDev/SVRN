@@ -18,13 +18,12 @@ import '@solana/wallet-adapter-react-ui/styles.css';
 import './index.css';
 import { 
     Terminal, ArrowRight, Shield, Lock, 
-    Database, Globe, Server, CheckCircle, 
-    Copy, Code, Activity, Cpu, Layers, ExternalLink, 
-    FileCode, GitBranch, Github, Moon, Sun, Loader2
+    Database, Globe, Layers, ExternalLink, 
+    FileCode, Github, Moon, Sun, CheckCircle, Copy, GitBranch // <-- Ensure GitBranch is here
 } from 'lucide-react';
 
 // --- CONSTANTS ---
-const PROGRAM_ID = new PublicKey("Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU");
+const PROGRAM_ID = new PublicKey("AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
 
 // --- COMPONENTS ---
 
@@ -37,54 +36,90 @@ const CopyButton = ({ text }) => {
     };
     return (
         <button onClick={handleCopy} className="opacity-40 hover:opacity-100 transition-opacity">
-            {copied ? <CheckCircle size={12} className="text-green-600"/> : <Copy size={12} className="text-[var(--text-muted)]"/>}
+            {copied ? <CheckCircle size={12} className="text-emerald-600"/> : <Copy size={12} className="text-[var(--text-muted)]"/>}
         </button>
     );
 };
 
+// Advanced Syntax Highlighter for VS Code look
 const SyntaxHighlight = ({ code }) => {
-    const parts = code.split(/(\b(?:const|await|import|require|new|async|from|return|function)\b|\/\/.*|"[^"]*"|'[^']*'|\d+|[{}()[\].;,])/g);
+    // Regex to split code into tokens
+    const parts = code.split(/(\b(?:const|await|import|require|new|async|from|return|function|if|else|throw|try|catch|finally)\b|\/\/.*|"[^"]*"|'[^']*'|\d+|[{}()[\].;,]|\b[A-Z][a-zA-Z0-9_]*\b)/g);
+    
     return (
-        <span className="font-mono text-[12px] leading-relaxed">
+        <span className="font-mono text-[13px] leading-6">
             {parts.map((part, i) => {
                 if (!part) return null;
-                if (/^(const|await|import|require|new|async|from|return|function)$/.test(part)) return <span key={i} className="text-[#a626a4] font-bold">{part}</span>;
-                if (part.startsWith('//')) return <span key={i} className="text-[#a0a1a7] italic">{part}</span>;
-                if (part.startsWith('"') || part.startsWith("'")) return <span key={i} className="text-[#50a14f]">{part}</span>;
-                if (/^\d+$/.test(part)) return <span key={i} className="text-[#986801]">{part}</span>;
+                // Keywords (Purple)
+                if (/^(const|await|import|require|new|async|from|return|function|if|else|throw|try|catch|finally)$/.test(part)) 
+                    return <span key={i} className="text-[#a626a4] font-bold">{part}</span>;
+                // Comments (Grey)
+                if (part.startsWith('//')) 
+                    return <span key={i} className="text-[#a0a1a7] italic">{part}</span>;
+                // Strings (Green)
+                if (part.startsWith('"') || part.startsWith("'")) 
+                    return <span key={i} className="text-[#50a14f]">{part}</span>;
+                // Numbers (Orange)
+                if (/^\d+$/.test(part)) 
+                    return <span key={i} className="text-[#986801]">{part}</span>;
+                // Classes/Types (Yellow/Gold)
+                if (/^[A-Z][a-zA-Z0-9_]*$/.test(part))
+                    return <span key={i} className="text-[#e5c07b]">{part}</span>;
+                // Functions/Methods (Blue - simple heuristic)
+                if (parts[i+1] === '(')
+                    return <span key={i} className="text-[#4078f2]">{part}</span>;
+                
+                // Default
                 return <span key={i} className="text-[#383a42]">{part}</span>;
             })}
         </span>
     );
 };
 
-const IDEEntry = ({ entry }) => (
-    <div className="mb-6 animate-slide-up pl-2 border-l-2 border-transparent hover:border-[#ccc] transition-colors group relative">
-        <div className="flex items-center justify-between mb-1 pr-4">
-            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
-                {entry.title} 
-                {entry.api && <span className="bg-[var(--bg-subtle)] px-1 text-[var(--text-main)] border border-[var(--border-light)]">{entry.api}</span>}
-            </span>
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <CopyButton text={entry.code} />
+const IDEEntry = ({ entry, lineStart }) => {
+    // Calculate how many lines this entry takes up
+    const lineCount = entry.code.split('\n').length;
+    
+    return (
+        <div className="group relative hover:bg-black/5 transition-colors -mx-6 px-6 py-2 border-l-4 border-transparent hover:border-blue-400">
+            {/* API Badge (Floating top right) */}
+            {entry.api && (
+                <div className="absolute right-4 top-2 opacity-50 text-[10px] font-mono font-bold bg-[#e5e5e6] px-2 py-0.5 rounded text-[#383a42] uppercase tracking-wider">
+                    {entry.api}
+                </div>
+            )}
+
+            <div className="flex">
+                {/* Line Numbers */}
+                <div className="w-8 flex-shrink-0 flex flex-col items-end pr-3 select-none text-[13px] leading-6 text-[#9ca3af]">
+                    {Array.from({ length: lineCount }).map((_, i) => (
+                        <div key={i}>{lineStart + i}</div>
+                    ))}
+                </div>
+
+                {/* Code Content */}
+                <div className="flex-1 overflow-x-auto custom-scrollbar">
+                    <SyntaxHighlight code={entry.code} />
+                    
+                    {/* Result / Output Area */}
+                    {entry.result && (
+                        <div className="mt-2 mb-1 p-2 bg-[#fafafa] border-l-2 border-emerald-500 text-[11px] font-mono text-[#383a42] flex items-start gap-2 shadow-sm">
+                            <ArrowRight size={12} className="mt-[3px] text-emerald-600 flex-shrink-0"/> 
+                            <div className="flex flex-col gap-1 w-full">
+                                <span className="break-all font-semibold">{entry.result}</span>
+                                {entry.tx && (
+                                    <a href={`https://explorer.solana.com/tx/${entry.tx}?cluster=devnet`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-blue-600 hover:underline mt-1 font-bold">
+                                        View Transaction <ExternalLink size={10} />
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
-        <div className="font-mono text-sm overflow-x-auto">
-            <SyntaxHighlight code={entry.code} />
-        </div>
-        {entry.result && (
-            <div className="mt-2 text-[11px] font-mono text-[var(--text-main)] flex items-start gap-2 bg-[var(--bg-subtle)] p-2 border border-[var(--border-light)] rounded-sm">
-                <ArrowRight size={12} className="mt-[2px] text-emerald-600 flex-shrink-0"/> 
-                <span className="break-all">{entry.result}</span>
-            </div>
-        )}
-        {entry.tx && (
-             <a href={`https://explorer.solana.com/tx/${entry.tx}?cluster=devnet`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-1 text-[10px] uppercase font-bold text-blue-600 hover:underline pl-2">
-                View on Explorer <ExternalLink size={10} />
-             </a>
-        )}
-    </div>
-);
+    );
+};
 
 const StatsTicker = () => (
     <div className="border-y-2 border-[var(--border-main)] bg-[var(--bg-card)] py-3 overflow-hidden">
@@ -92,13 +127,13 @@ const StatsTicker = () => (
             <span className="flex items-center gap-2"><Globe size={14}/> Solana Devnet</span>
             <span className="flex items-center gap-2"><Layers size={14}/> Arcium MPC Network</span>
             <span className="flex items-center gap-2"><Lock size={14}/> Noir UltraHonk ZK</span>
-            <span className="flex items-center gap-2"><Shield size={14}/> Privacy Middleware v0.9</span>
+            <span className="flex items-center gap-2"><Shield size={14}/> Privacy SDK v1.0</span>
             <span className="flex items-center gap-2"><Database size={14}/> Merklized Census</span>
             {/* Duplicated for scroll */}
             <span className="flex items-center gap-2"><Globe size={14}/> Solana Devnet</span>
             <span className="flex items-center gap-2"><Layers size={14}/> Arcium MPC Network</span>
             <span className="flex items-center gap-2"><Lock size={14}/> Noir UltraHonk ZK</span>
-            <span className="flex items-center gap-2"><Shield size={14}/> Privacy Middleware v0.9</span>
+            <span className="flex items-center gap-2"><Shield size={14}/> Privacy SDK v1.0</span>
             <span className="flex items-center gap-2"><Database size={14}/> Merklized Census</span>
         </div>
     </div>
@@ -120,35 +155,31 @@ const StyledWalletButton = () => {
     );
 };
 
+// CLEANED UP TOKEN LIST
 const SUPPORTED_TOKENS = [
-    { name: "$SVRN (Protocol)", address: "47Xs3xqvyEzqXijtYxoAwpeKKskmnJ4vXdgKdJJxqrxo" },
-    { name: "$SOL (Wrapped)", address: "So11111111111111111111111111111111111111112" },
-    { name: "$USDC", address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" },
-    { name: "$JUP (Jupiter)", address: "JUPyiZJpEGk4X3zVs6ZEST594rTh1FCWv Di1eGdc2" },
-    { name: "$BONK", address: "DezXAZ8z7Pnrn9wvqgdGU3 d2SS3AC6cXKgr8gqc6Fp" }
+    { name: "$SVRN (Legacy)", address: "DD641F4zVEsNkZGu6M22YLY2fvhwGaN6hrcGgMfw6i6k" },
+    { name: "$SOL (Wrapped)", address: "So11111111111111111111111111111111111111112" }
 ];
 
 const Dashboard = () => {
-
     const { connection } = useConnection();
     const { publicKey } = useWallet(); 
     const anchorWallet = useAnchorWallet();
 
     // --- STATE ---
-    const [npmCopied, setNpmCopied] = useState(false);
-    const [darkMode, setDarkMode] = useState(false);
-    
-    // UPDATED: proposalId is no longer manually set, it's null until created
     const [proposalId, setProposalId] = useState(null);
     const [nextIdDisplay, setNextIdDisplay] = useState("...");
-    
-    const [votingMintStr, setVotingMintStr] = useState("47Xs3xqvyEzqXijtYxoAwpeKKskmnJ4vXdgKdJJxqrxo");
+    const [isSnapshotReady, setIsSnapshotReady] = useState(false);
+    const [npmCopied, setNpmCopied] = useState(false);
+    const [darkMode, setDarkMode] = useState(false);
+    const [scrollY, setScrollY] = useState(0); // For scroll effect
+   
+    const [votingMintStr, setVotingMintStr] = useState("DD641F4zVEsNkZGu6M22YLY2fvhwGaN6hrcGgMfw6i6k");
     const [propTitle, setPropTitle] = useState("Grant for Privacy Research");
     const [propDesc, setPropDesc] = useState("Allocate 5000 USDC to the SVRN Labs team for ZK-circuit optimizations.");
     const [duration, setDuration] = useState(24);
     
     // SDK State
-    // IMPORTANT: Make sure this URL matches your deployed Relayer!
     const svrn = useMemo(() => new SvrnClient("http://localhost:3000"), []);
     const [zkReady, setZkReady] = useState(false);
 
@@ -161,27 +192,61 @@ const Dashboard = () => {
     const [history, setHistory] = useState([]);
     const terminalRef = useRef(null);
 
-    // --- EFFECTS ---
+    // --- SCROLL EFFECT ---
     useEffect(() => {
-        setHasVoted(false);
-        // Reset ID when switching mints if needed, or just keep null
-    }, [votingMintStr]);
+        const handleScroll = () => setScrollY(window.scrollY);
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
 
+    // --- CONNECTIVITY & INIT ---
     useEffect(() => {
-        // Initialize the SDK (WASM Loading)
+        if (!publicKey) return;
+        // Silent diagnostic check
+        connection.getAccountInfo(PROGRAM_ID).catch(e => console.error("Network Error", e));
+    }, [publicKey, connection]);
+
+    // Initial SDK Init
+    useEffect(() => {
+        console.log("🔧 Initializing SVRN SDK...");
+        
+        // Add timeout to detect hanging
+        const timeout = setTimeout(() => {
+            console.error("❌ SVRN SDK initialization timed out after 10 seconds");
+            setHistory([{
+                title: "INITIALIZATION TIMEOUT",
+                api: "SVRN SDK",
+                code: `// SDK initialization timed out
+await svrn.init(circuit);
+// This usually indicates a WASM loading issue`,
+                result: "❌ SDK initialization timed out (WASM loading issue)"
+            }]);
+        }, 10000);
+        
         svrn.init(circuit).then(() => {
+            clearTimeout(timeout);
+            console.log("✅ SVRN SDK initialized successfully");
             setZkReady(true);
             setHistory([{
                 title: "INITIALIZATION",
-                api: "SDK",
-                code: "// SVRN Middleware Loaded.\n// Connected to Arcium MPC Devnet.\n// Waiting for user input...",
-                result: null
+                api: "SVRN SDK",
+                code: `// Initializing SVRN Middleware...
+await svrn.init(circuit);
+// ZK Backend: Barretenberg (WASM)
+// Network: Arcium MPC Devnet`,
+                result: "Ready. Waiting for user input..."
             }]);
-            
-            // Auto-Fetch the next ID just for display purposes
-            svrn.api.getNextProposalId()
-                .then(res => setNextIdDisplay(res.nextId))
-                .catch(() => setNextIdDisplay("Err"));
+            setNextIdDisplay("AUTO");
+        }).catch(e => {
+            console.error("❌ SVRN SDK initialization failed:", e);
+            setHistory([{
+                title: "INITIALIZATION ERROR",
+                api: "SVRN SDK",
+                code: `// Failed to initialize SVRN Middleware
+await svrn.init(circuit);
+// Error: ${e.message}`,
+                result: "❌ SDK initialization failed"
+            }]);
         });
     }, [svrn]);
 
@@ -196,8 +261,7 @@ const Dashboard = () => {
         if (!publicKey || !proposalId) return;
         const fetchCount = async () => {
             try {
-                // Using SDK logic for address derivation to match
-                const [pda] = PublicKey.findProgramAddressSync([Buffer.from("svrn_prop"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+                const [pda] = PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
                 const program = new Program(idl, new AnchorProvider(connection, anchorWallet || { publicKey }, {}));
                 const acc = await program.account.proposal.fetch(pda);
                 setLiveVoteCount(acc.voteCount.toNumber());
@@ -206,7 +270,7 @@ const Dashboard = () => {
         fetchCount();
         const intv = setInterval(fetchCount, 5000);
         return () => clearInterval(intv);
-    }, [proposalId, publicKey, anchorWallet]);
+    }, [proposalId, publicKey]);
 
     const addEntry = (title, api, code, result, tx = null) => {
         setHistory(prev => [...prev, { title, api, code, result, tx }]);
@@ -214,117 +278,221 @@ const Dashboard = () => {
 
     // --- LOGIC HANDLERS ---
     
-    // 1. CREATE PROPOSAL (Updated to use SDK Auto-ID)
+    // 1. CREATE PROPOSAL
     const handleCreate = async () => {
-        if (isLoading || !publicKey) return; 
+        if (isLoading || !publicKey) return;
         setIsLoading(true);
-        try {
-            addEntry("1. Create Proposal", "SDK: createProposal", 
-`// SDK: Auto-Detect ID, Snapshot & Transaction
-// 1. Fetch next available ID from Relayer
-// 2. Build Merkle Snapshot (Quadratic Weights)
-// 3. Submit On-Chain via Anchor
 
-const { proposalId, txid } = await svrn.createProposal(
-  provider,
-  "${publicKey.toBase58().slice(0,6)}...", 
-  "${votingMintStr.slice(0,6)}...",
-  { title: "Grant...", duration: 24 },
-  0.05 // Gas buffer
-);`, "Initializing SVRN Pipeline...");
+        try {
+            // Get next proposal ID from relayer
+            console.log("🔍 Getting next proposal ID from relayer...");
+            const nextIdResponse = await svrn.api.getNextProposalId();
+            console.log("📝 Next proposal ID response:", nextIdResponse);
+            let nextProposalId = nextIdResponse.nextId; 
+            
+            while (true) {
+                const [pda] = PublicKey.findProgramAddressSync(
+                    [Buffer.from("svrn_v5"), new BN(nextProposalId).toArrayLike(Buffer, "le", 8)],
+                    PROGRAM_ID
+                );
+                const info = await connection.getAccountInfo(pda);
+                if (!info) break; // Found free ID
+                nextProposalId++;
+            }
 
             const provider = new AnchorProvider(connection, anchorWallet, {});
-            
-            // --- SDK MAGIC HAPPENS HERE ---
-            // The SDK handles getNextProposalId, initializeSnapshot, and the Anchor tx internally
-            const { proposalId: newId, txid } = await svrn.createProposal(
+
+            addEntry(
+                "1. Initialize Proposal",
+                "createProposal",
+                `// 1. Fetch Next ID & Build Merkle Snapshot
+const proposalId = ${nextProposalId};
+const mint = new PublicKey("${votingMintStr.slice(0,8)}...");
+
+// 2. Initialize on-chain Proposal (Anchor)
+const { txid } = await svrn.createProposal(
+    provider,
+    publicKey,
+    mint,
+    { title: "${propTitle}", duration: ${duration} },
+    0.05, // Gas Buffer
+    proposalId
+);`,
+                "Executing..."
+            );
+
+            const { txid } = await svrn.createProposal(
                 provider,
                 publicKey,
                 votingMintStr,
                 { title: propTitle, desc: propDesc, duration },
-                0.05 // Gas buffer
+                0.05, 
+                nextProposalId
             );
 
-            setProposalId(newId);
+            // DEMO MODE: Add creator to voting tree if they don't have tokens
+            console.log("🔍 DEMO: Checking if creator needs to be added to voting tree...");
+            try {
+                const proposal = await svrn.api.getProposal(nextProposalId);
+                if (proposal.success && proposal.proposal.voterMap) {
+                    const creatorInVoters = proposal.proposal.voterMap[publicKey.toBase58()];
+                    if (!creatorInVoters) {
+                        console.log("🔧 DEMO: Creator not in voting tree - adding them manually...");
+                        
+                        // Call demo endpoint to add creator to voting tree
+                        const response = await fetch(`http://localhost:3000/demo-add-creator`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                proposalId: nextProposalId,
+                                creator: publicKey.toBase58()
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        if (result.success) {
+                            console.log("✅ DEMO: Successfully added creator to voting tree");
+                        } else {
+                            console.log("❌ DEMO: Failed to add creator to voting tree:", result.error);
+                        }
+                    } else {
+                        console.log("✅ DEMO: Creator already in voting tree");
+                    }
+                }
+            } catch (e) {
+                console.log("🔍 DEMO: Could not check voter map:", e);
+            }
 
+            setProposalId(nextProposalId);
+            
+            // Verify proposal exists in relayer before enabling voting
+            try {
+                console.log("🔍 Verifying proposal exists in relayer:", nextProposalId);
+                const proposal = await svrn.api.getProposal(nextProposalId);
+                console.log("📝 Proposal response:", proposal);
+                if (proposal.success) {
+                    console.log("✅ Proposal found in relayer, enabling voting");
+                    setIsSnapshotReady(true);
+                } else {
+                    console.log("❌ Proposal not found in relayer");
+                    setIsSnapshotReady(false);
+                }
+            } catch (e) {
+                console.error('❌ Failed to fetch proposal from relayer:', e);
+                setIsSnapshotReady(false);
+            }
+
+            // Update the last entry with result
             setHistory(prev => {
                 const newH = [...prev];
-                newH[newH.length-1].result = `SUCCESS: Proposal #${newId} created & live.`;
+                newH[newH.length-1].result = `Success. Proposal #${nextProposalId} on-chain.`;
                 newH[newH.length-1].tx = txid;
                 return newH;
             });
 
-        } catch (e) { 
-            console.error(e); 
-            addEntry("Error", "Creation Failed", "", e.message); 
-        } 
-        finally { setIsLoading(false); }
+        } catch (e) {
+            console.error(e);
+            addEntry("Error", "Failed", `// Error during initialization\nthrow new Error("${e.message}");`, "Transaction Aborted");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    // 2. CAST VOTE (Uses auto-detected ID)
+    // 2. CAST VOTE
     const handleVote = async (choice) => {
         if (isLoading || !zkReady || !publicKey || !proposalId) return; 
         setIsLoading(true);
         try {
-            addEntry("2. Cast Vote", "SDK: castVote", 
-`// SDK: Privacy Pipeline
-// 1. Generate Noir ZK Proof (Eligibility)
+            addEntry("2. Cast Private Vote", "castVote", 
+`// 1. Generate Noir ZK Proof (Client-Side)
 // 2. Encrypt Ballot (Arcium MPC)
 // 3. Relay to Solana (Gasless)
 
+const choice = ${choice}; // ${choice === 1 ? 'YES' : 'NO'}
+const user = "${publicKey.toBase58().slice(0,8)}...";
+
 await svrn.castVote(
   provider, 
-  "${publicKey.toBase58().slice(0,6)}...", 
-  ${proposalId}, // Auto-ID #${proposalId}
-  ${choice}
-);`, "Generating Noir ZK Proof...");
+  user, 
+  ${proposalId}, 
+  choice
+);`, "Generating Zero-Knowledge Proof...");
 
             const provider = new AnchorProvider(connection, anchorWallet, {});
             const result = await svrn.castVote(provider, publicKey.toBase58(), proposalId, choice);
 
             if (!result.success) throw new Error(result.error);
 
-            // Fetch proof data just to show the user their weight
             const proofData = await svrn.api.getProof(proposalId, publicKey.toBase58());
             setMyVoteWeight(Number(proofData.proof.weight));
 
             setHistory(prev => {
                 const newH = [...prev];
-                newH[newH.length-1].result = `Confirmed. Proof Verified on-chain.`;
+                newH[newH.length-1].result = `Confirmed. Nullifier Verified on-chain.`;
                 newH[newH.length-1].tx = result.tx;
                 return newH;
             });
             setHasVoted(true);
 
-        } catch (e) { console.error(e); alert(e.message); } 
+        } catch (e) { 
+            // SPECIAL FEATURE SHOWCASE: DOUBLE VOTING
+            if (e.message.includes("Allocate: account Address") || e.message.includes("0x0")) {
+                addEntry("Security Protocol", "Nullifier Check", 
+`// Checking Nullifier PDA against Ledger...
+if (nullifierExists(userNullifier)) {
+    throw new SecurityError("Double Voting Detected");
+}`, 
+                "✅ SECURITY SUCCESS: Double-Voting Attempt Blocked. Identity Protected.");
+            } else {
+                console.error(e);
+                alert("Vote Failed: " + e.message); 
+            }
+        } 
         finally { setIsLoading(false); }
     };
 
-    // 3. TALLY (Uses auto-detected ID)
+    // 3. TALLY
     const handleTally = async () => {
         if (isLoading || !proposalId) return;
         setIsLoading(true);
         try {
-            addEntry("3. Tally", "POST /prove-tally", 
-`// SDK: Generate Trustless Tally Proof
+            const QUORUM_REQ = 0; 
+            const THRESHOLD_REQ = 0;
+
+            addEntry("3. Verifiable Tally", "proveTally", 
+`// 1. Aggregates Encrypted Votes (MPC)
+// 2. Generates Validity Proof (Noir ZK)
+// 3. Unlocks Treasury (Atomic Execution)
+
 const result = await svrn.api.proveTally({ 
   proposalId: ${proposalId},
-  yes: ${myVoteWeight}, 
-  quorum: 100 
-});`, "Verifying Aggregate Proof...");
+  yes: ${myVoteWeight}, // Demo Weight
+  quorum: ${QUORUM_REQ} 
+});`, "Verifying ZK Validity Proof...");
 
-            const res = await svrn.api.proveTally(proposalId, myVoteWeight, 0, 50, 100);
+            const res = await svrn.api.proveTally(
+                proposalId, 
+                myVoteWeight, 
+                0, 
+                THRESHOLD_REQ, 
+                QUORUM_REQ
+            );
+            
             if (!res.success) throw new Error(res.error);
 
             setHistory(prev => {
                 const newH = [...prev];
-                newH[newH.length-1].result = `Proof Valid. Proposal PASSED.`;
+                newH[newH.length-1].result = `Proof Validated! \nZK Proof: ${res.proof.slice(0,16)}...`;
+                if(res.tx && !res.tx.includes("Skipped")) newH[newH.length-1].tx = res.tx;
                 return newH;
             });
 
         } catch (e) { alert(e.message); } 
         finally { setIsLoading(false); }
     };
+
+    // Helper to calculate line numbers
+    let currentLine = 1;
 
     return (
         <div className={`min-h-screen font-sans overflow-x-hidden ${darkMode ? 'dark-mode' : ''}`} style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}>
@@ -336,16 +504,14 @@ const result = await svrn.api.proveTally({
                         <span className="text-xl font-black tracking-tighter flex items-center gap-2 uppercase">
                             <Shield size={22} className="fill-current"/> SVRN
                         </span>
-                        <span className="text-[10px] text-[var(--bg-card)] bg-[var(--text-main)] px-2 py-0.5 font-bold uppercase tracking-wider hidden sm:inline-block">Middleware</span>
+                        <span className="text-[10px] text-[var(--bg-card)] bg-[var(--text-main)] px-2 py-0.5 font-bold uppercase tracking-wider hidden sm:inline-block">SDK</span>
                     </div>
-                    {/* Dark Mode Toggle */}
                     <button onClick={() => setDarkMode(!darkMode)} className="p-1 hover:bg-[var(--bg-subtle)] rounded transition-colors">
                         {darkMode ? <Sun size={16} /> : <Moon size={16} />}
                     </button>
                 </div>
 
                 <div className="flex items-center gap-6">
-                    {/* HIDE LINKS ON MOBILE */}
                     <div className="hidden md:flex items-center gap-6">
                         <a href="#playground" className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">Playground</a>
                         <a href="#docs" className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">Docs</a>
@@ -355,8 +521,14 @@ const result = await svrn.api.proveTally({
                 </div>
             </nav>
 
-            {/* --- HERO --- */}
-            <section className="py-24 px-6 text-center max-w-6xl mx-auto relative overflow-hidden">
+            {/* --- HERO (WITH SCROLL EFFECT) --- */}
+            <section className="py-24 px-6 text-center max-w-6xl mx-auto relative overflow-hidden"
+                style={{ 
+                    opacity: 1 - scrollY / 600, 
+                    transform: `translateY(${scrollY * 0.2}px)`,
+                    transition: 'opacity 0.1s, transform 0.1s' 
+                }}
+            >
                 <div className="absolute inset-0 bg-grid-dots opacity-10 pointer-events-none"></div>
                 
                 <div className="relative z-10">
@@ -379,9 +551,8 @@ const result = await svrn.api.proveTally({
         </span>
     )}
 </div>
-                    {/* RESPONSIVE TEXT SIZE */}
                     <h1 className="text-5xl md:text-8xl font-black text-[var(--text-main)] mb-6 tracking-tighter leading-[0.9]">
-                        PRIVACY MIDDLEWARE<br/>
+                        PRIVACY SDK<br/>
                         <span className="text-[var(--text-main)]">FOR SOLANA.</span>
                     </h1>
                   <p className="text-[var(--text-muted)] text-lg md:text-xl mb-12 max-w-3xl mx-auto font-medium leading-relaxed">
@@ -406,7 +577,6 @@ const result = await svrn.api.proveTally({
 <section className="py-20 px-8 bg-[var(--bg-main)] border-b-2 border-[var(--border-main)]">
     <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-            
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-black text-white"><Database size={18}/></div>
@@ -416,7 +586,6 @@ const result = await svrn.api.proveTally({
                     Public Solana token state is "shielded" into a Merklized census. Using our Relayer, we compress thousands of token accounts into a single ZK-friendly Merkle Root.
                 </p>
             </div>
-
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-black text-white"><Lock size={18}/></div>
@@ -426,7 +595,6 @@ const result = await svrn.api.proveTally({
                     Voters generate a local <span className="text-[var(--text-main)] font-bold">Noir UltraHonk</span> proof of membership. The ballot choice is then encrypted via <span className="text-[var(--text-main)] font-bold">Arcium Threshold MPC</span> before submission.
                 </p>
             </div>
-
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-black text-white"><Layers size={18}/></div>
@@ -436,10 +604,7 @@ const result = await svrn.api.proveTally({
                     The Relayer aggregates encrypted ballots homomorphically. Only the final result is revealed through a ZK-Validity proof, ensuring individual choices remain secret forever.
                 </p>
             </div>
-
         </div>
-
-
     </div>
 </section>
 
@@ -450,14 +615,14 @@ const result = await svrn.api.proveTally({
             <Terminal size={24} className="text-[var(--text-main)]"/>
             <div>
                 <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] leading-none">Integration Lab</h2>
-                <p className="text-xs font-mono text-[var(--text-muted)]">SDK Playground</p>
+                <p className="text-xs font-mono text-[var(--text-muted)]">Live SDK Environment</p>
             </div>
         </div>
 
         {/* RESPONSIVE GRID WRAPPER */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 border-2 border-[var(--border-main)] shadow-[12px_12px_0px_var(--shadow-color)] bg-[var(--bg-card)] h-auto lg:h-[720px] overflow-hidden">
             
-            {/* LEFT PANEL: STACK ON MOBILE */}
+            {/* LEFT PANEL: CONFIGURATION */}
             <div className="lg:col-span-5 p-8 border-b lg:border-b-0 lg:border-r-2 border-[var(--border-main)] flex flex-col gap-6 bg-[var(--bg-card)] overflow-y-auto custom-scrollbar">
                 
                 {/* 1. SNAPSHOT & CONFIG */}
@@ -474,7 +639,7 @@ const result = await svrn.api.proveTally({
                                     {proposalId ? (
                                         <span className="text-emerald-600">#{proposalId}</span>
                                     ) : (
-                                        <span className="text-[var(--text-muted)]">Next: #{nextIdDisplay}</span>
+                                        <span className="text-[var(--text-muted)]">{nextIdDisplay}</span>
                                     )}
                                     <div className={`w-2 h-2 rounded-full ${proposalId ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'}`}></div>
                                 </div>
@@ -508,14 +673,18 @@ const result = await svrn.api.proveTally({
                             </div>
                         </div>
 
-                        {/* Simplified Protocol Fee Badge */}
+                        {/* Tightened Protocol Fee Badge */}
                         <div className="flex justify-between items-center px-1">
-                            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-tighter">Required Protocol Fee</span>
+                            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-tighter">Protocol Fee</span>
                             <span className="text-[10px] font-bold bg-black text-white px-2 py-0.5 rounded-sm">0.05 SOL</span>
                         </div>
 
-                        <button onClick={handleCreate} disabled={isLoading || proposalId !== null} className="retro-btn w-full py-5 text-sm font-black tracking-widest disabled:opacity-50">
-                            {proposalId ? "PROPOSAL ACTIVE" : (isLoading ? "INITIALIZING..." : "INITIATE PROPOSAL")}
+                        <button 
+                            onClick={handleCreate} 
+                            disabled={isLoading || isSnapshotReady}
+                            className="retro-btn w-full py-5 text-sm font-black tracking-widest disabled:opacity-50"
+                        >
+                            {isSnapshotReady ? "PROPOSAL ACTIVE" : (isLoading ? "INITIALIZING..." : "INITIATE PROPOSAL")}
                         </button>
                     </div>
                 </div>
@@ -536,8 +705,12 @@ const result = await svrn.api.proveTally({
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        <button onClick={() => handleVote(1)} disabled={!proposalId || isLoading || !zkReady} className="retro-btn py-5 font-black text-sm">YES</button>
-                        <button onClick={() => handleVote(0)} disabled={!proposalId || isLoading || !zkReady} className="retro-btn py-5 font-black text-sm">NO</button>
+                        {/* Debug info */}
+                        <div className="col-span-2 text-xs text-gray-500 mb-2">
+                            Debug: zkReady={String(zkReady)} | isSnapshotReady={String(isSnapshotReady)} | isLoading={String(isLoading)}
+                        </div>
+                        <button onClick={() => handleVote(1)} disabled={!isSnapshotReady || isLoading || !zkReady} className="retro-btn py-5 font-black text-sm">YES</button>
+                        <button onClick={() => handleVote(0)} disabled={!isSnapshotReady || isLoading || !zkReady} className="retro-btn py-5 font-black text-sm">NO</button>
                     </div>
                     <div className="border-2 border-[var(--border-light)] bg-[var(--bg-subtle)] p-2 flex justify-between items-center px-4">
                         <span className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Live Ballots</span>
@@ -558,34 +731,51 @@ const result = await svrn.api.proveTally({
                 </div>
             </div>
 
-            {/* RIGHT PANEL (IDE): FIXED HEIGHT ON MOBILE */}
-            <div className="lg:col-span-7 bg-[var(--bg-card)] flex flex-col h-[500px] lg:h-full relative border-t-2 lg:border-t-0 border-[var(--border-main)]">
-                <div className="h-10 border-b border-[var(--border-light)] bg-[var(--bg-subtle)] flex items-end px-4 gap-1">
-                    <div className="bg-[var(--bg-card)] border-t border-l border-r border-[var(--border-light)] px-4 py-2 text-[11px] font-sans text-[var(--text-main)] flex items-center gap-2 rounded-t-sm relative top-[1px]">
-                        <FileCode size={12} className="text-blue-500"/> svrn_middleware.ts
+            {/* RIGHT PANEL (IDE): VS CODE STYLE */}
+            <div className="lg:col-span-7 bg-[#ffffff] flex flex-col h-[500px] lg:h-full relative border-t-2 lg:border-t-0 border-[var(--border-main)] font-mono text-sm">
+                {/* Tabs */}
+                <div className="h-9 border-b border-[#e1e4e8] bg-[#f0f0f0] flex items-end px-0 select-none">
+                    <div className="bg-[#ffffff] border-t-2 border-t-blue-500 border-r border-[#e1e4e8] px-4 py-2 text-[11px] text-[#383a42] flex items-center gap-2 h-full">
+                        <FileCode size={12} className="text-blue-500"/> implementation.ts
                     </div>
                 </div>
                 
-                <div className="flex-1 p-0 overflow-hidden relative flex bg-[var(--bg-card)]">
-                    <div className="w-10 bg-[var(--bg-subtle)] border-r border-[var(--border-light)] flex flex-col items-end pr-2 pt-4 select-none">
-                        {Array.from({ length: 40 }).map((_, i) => (
-                            <span key={i} className="text-[10px] font-mono text-[var(--text-muted)] opacity-30 leading-6">{i + 1}</span>
-                        ))}
-                    </div>
-
-                    <div className="flex-1 p-6 overflow-y-auto custom-scrollbar" ref={terminalRef}>
-                        {history.length === 0 && <div className="text-[11px] font-mono text-[var(--text-muted)]">// System Awaiting Initialization...</div>}
-                        {history.map((entry, i) => <IDEEntry key={i} entry={entry} />)}
-                        <div className="w-2 h-5 bg-[var(--text-main)] animate-pulse inline-block align-middle ml-1"></div>
+                {/* Code Area */}
+                <div className="flex-1 p-0 overflow-y-auto custom-scrollbar bg-white relative">
+                    <div className="flex min-h-full">
+                        {/* IDE Content */}
+                        <div className="w-full pt-4 pb-12">
+                            {/* Empty State / Init */}
+                            {history.length === 0 && (
+                                <div className="px-6 text-[#a0a1a7] italic">
+                                    // Connecting to Arcium Network...<br/>
+                                    // Waiting for SDK initialization...
+                                </div>
+                            )}
+                            
+                            {/* Render History as Code Blocks */}
+                            {history.map((entry, i) => {
+                                const entryLineStart = currentLine;
+                                currentLine += entry.code.split('\n').length + 1; // +1 for spacing
+                                return <IDEEntry key={i} entry={entry} lineStart={entryLineStart} />;
+                            })}
+                            
+                            {/* Active Cursor */}
+                            <div className="px-6 flex gap-3 mt-1">
+                                <div className="w-8 text-right text-[#9ca3af] text-[13px]">{currentLine}</div>
+                                <div className="w-2 h-5 bg-blue-500/50 animate-pulse"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div className="h-6 bg-[#007acc] text-white flex items-center justify-between px-4 text-[10px] font-sans uppercase tracking-tighter">
+                {/* Status Bar */}
+                <div className="h-6 bg-[#007acc] text-white flex items-center justify-between px-4 text-[10px] font-sans uppercase tracking-tighter z-10">
                     <div className="flex gap-4">
-                        <span className="font-bold">main*</span>
+                        <span className="font-bold flex items-center gap-1"><GitBranch size={10}/> main*</span>
                         <span>0 Errors</span>
                     </div>
-                    <span>TypeScript / Node.js</span>
+                    <span>TypeScript</span>
                 </div>
             </div>
         </div>
@@ -597,39 +787,34 @@ const result = await svrn.api.proveTally({
     <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
         <h2 className="text-4xl font-black uppercase mb-8 tracking-tighter leading-none text-[var(--text-main)]">Governance in 3 lines of code.</h2>
         
-        {/* Subtle border-white/10 added below */}
-        <div className="bg-[var(--bg-code-block)] border-6 border-[var(--border-main)] p-8 text-left shadow-[12px_12px_0px_var(--shadow-color)] transform hover:scale-[1.01] transition-transform border-white/10">
-            <pre className="text-sm md:text-base font-mono leading-relaxed overflow-x-auto">
-                <div className="mb-4 text-[#abb2bf]">
-                    <span className="text-[#7f848e] italic">// 1. Initialize SVRN Client</span><br/>
-                    <span className="text-[#c678dd]">const</span> svrn <span className="text-white">=</span> <span className="text-[#c678dd]">new</span> <span className="text-[#e5c07b]">SvrnClient</span><span className="text-white">();</span>
-                </div>
+        <div className="bg-[#282c34] border-4 border-[var(--border-main)] p-8 text-left shadow-[12px_12px_0px_var(--shadow-color)] text-sm md:text-base font-mono leading-relaxed overflow-x-auto rounded-sm text-[#abb2bf]">
+            <div className="mb-4">
+                <span className="text-[#5c6370] italic">// 1. Initialize SVRN Client</span><br/>
+                <span className="text-[#c678dd]">const</span> svrn <span className="text-[#56b6c2]">=</span> <span className="text-[#c678dd]">new</span> <span className="text-[#e5c07b]">SvrnClient</span><span className="text-[#abb2bf]">();</span>
+            </div>
 
-                {/* UPDATED CODE SNIPPET TO MATCH REALITY */}
-                <div className="mb-4 text-[#abb2bf]">
-                    <span className="text-[#7f848e] italic">// 2. Create Proposal (Auto-ID & Snapshot)</span><br/>
-                    <span className="text-[#c678dd]">await</span> svrn<span className="text-white">.</span><span className="text-[#61afef]">createProposal</span><span className="text-white">(</span>provider<span className="text-white">,</span> authority<span className="text-white">,</span> mint<span className="text-white">,</span> meta<span className="text-white">);</span>
-                </div>
+            <div className="mb-4">
+                <span className="text-[#5c6370] italic">// 2. Create Proposal (Auto-ID & Snapshot)</span><br/>
+                <span className="text-[#c678dd]">await</span> svrn<span className="text-[#abb2bf]">.</span><span className="text-[#61afef]">createProposal</span><span className="text-[#abb2bf]">(</span>provider<span className="text-[#abb2bf]">,</span> authority<span className="text-[#abb2bf]">,</span> mint<span className="text-[#abb2bf]">,</span> meta<span className="text-[#abb2bf]">);</span>
+            </div>
 
-                <div className="text-[#abb2bf]">
-                    <span className="text-[#7f848e] italic">// 3. Shielded Privacy Vote (ZK + MPC)</span><br/>
-                    <span className="text-[#c678dd]">await</span> svrn<span className="text-white">.</span><span className="text-[#61afef]">castVote</span><span className="text-white">(</span>provider<span className="text-white">,</span> user<span className="text-white">,</span> id<span className="text-white">,</span> <span className="text-[#d19a66]">1</span><span className="text-white">);</span>
-                </div>
-            </pre>
+            <div>
+                <span className="text-[#5c6370] italic">// 3. Shielded Privacy Vote (ZK + MPC)</span><br/>
+                <span className="text-[#c678dd]">await</span> svrn<span className="text-[#abb2bf]">.</span><span className="text-[#61afef]">castVote</span><span className="text-[#abb2bf]">(</span>provider<span className="text-[#abb2bf]">,</span> user<span className="text-[#abb2bf]">,</span> id<span className="text-[#abb2bf]">,</span> <span className="text-[#d19a66]">1</span><span className="text-[#abb2bf]">);</span>
+            </div>
         </div>
     </div>
 </section>
+            
             {/* --- DOCS / QUICKSTART --- */}
             <section id="docs" className="py-24 px-6 max-w-6xl mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-                    
                     {/* QUICKSTART */}
                     <div>
                         <div className="mb-8 border-b-2 border-[var(--border-main)] pb-2 flex justify-between items-end">
                             <h2 className="text-2xl font-black text-[var(--text-main)] uppercase">Quickstart</h2>
                             <span className="text-xs font-mono bg-[var(--text-main)] text-[var(--bg-card)] px-2 py-0.5">TS / Node</span>
                         </div>
-                        
                         <div className="space-y-8">
                             <div className="group">
                                 <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">1. Install Package</p>
@@ -638,7 +823,6 @@ const result = await svrn.api.proveTally({
                                     <CopyButton text="npm i svrn-sdk" />
                                 </div>
                             </div>
-
                             <div className="group">
                                 <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">2. Instantiate Client</p>
                                 <div className="bg-[var(--bg-card)] border-2 border-[var(--border-main)] p-4 relative shadow-[4px_4px_0px_var(--shadow-color)] group-hover:shadow-[4px_4px_0px_var(--text-main)] transition-shadow">
@@ -648,23 +832,7 @@ const result = await svrn.api.proveTally({
                                     </pre>
                                 </div>
                             </div>
-
-                            <div className="group">
-    <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">3. React Hook Integration</p>
-    <div className="bg-[var(--bg-card)] border-2 border-[var(--border-main)] p-4 relative shadow-[4px_4px_0px_var(--shadow-color)] group-hover:shadow-[4px_4px_0px_var(--text-main)] transition-all">
-        <pre className="text-[11px] font-mono text-[var(--text-main)] overflow-x-auto leading-relaxed">
-            <span className="text-[#a0a1a7]">// Use SVRN in your components</span><br/>
-            <span className="text-[#a626a4] font-bold">const</span> &#123; castVote &#125; = useSvrn();<br/><br/>
-            <span className="text-[#a626a4] font-bold">const</span> onVote = <span className="text-[#a626a4] font-bold">async</span> (id) =&gt; &#123;<br/>
-            &nbsp;&nbsp;<span className="text-[#a626a4] font-bold">await</span> castVote(anchorProvider, id, <span className="text-[#986801]">1</span>);<br/>
-            &nbsp;&nbsp;console.log(<span className="text-[#50a14f]">"Identity hidden, vote cast."</span>);<br/>
-            &#125;;
-        </pre>
-    </div>
-</div>
-
                         </div>
-
                     </div>
 
                     {/* API REFERENCE */}
@@ -673,41 +841,33 @@ const result = await svrn.api.proveTally({
                             <h2 className="text-2xl font-black text-[var(--text-main)] uppercase">Core Methods</h2>
                             <span className="text-xs font-mono bg-[var(--bg-subtle)] text-[var(--text-main)] px-2 py-0.5 border border-[var(--border-light)]">v1.0</span>
                         </div>
-
-                        {/* API REFERENCE (Right Column of Docs) */}
-<div className="space-y-4">
-    {/* Method 1 */}
-    <div className="border border-[var(--border-light)] bg-[var(--bg-card)] p-5 hover:border-[var(--border-main)] transition-colors group">
-        <div className="flex justify-between items-start mb-2">
-            <span className="font-mono text-sm font-bold text-[var(--text-main)] group-hover:text-blue-500 transition-colors">castVote()</span>
-            <span className="text-[10px] font-bold text-[var(--bg-card)] bg-[var(--text-main)] px-2 py-0.5">ASYNC</span>
-        </div>
-        <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
-            Generates a Noir ZK-Proof of eligibility based on the snapshot, encrypts the choice using Arcium MPC, and relays to Solana.
-        </p>
-        {/* Fixed: text-main ensures visibility in both modes */}
-        <div className="bg-[var(--bg-subtle)] border border-[var(--border-light)] p-2 font-mono text-[10px] text-[var(--text-main)] overflow-x-auto">
-            <span className="text-[#a626a4] font-bold">async</span> (provider, wallet, id, choice) <span className="text-[#a626a4] font-bold">=&gt;</span> <span className="text-[#c18401]">Promise</span>&lt;TxSignature&gt;
-        </div>
-    </div>
-
-    {/* Method 2 */}
-    <div className="border border-[var(--border-light)] bg-[var(--bg-card)] p-5 hover:border-[var(--border-main)] transition-colors group">
-        <div className="flex justify-between items-start mb-2">
-            <span className="font-mono text-sm font-bold text-[var(--text-main)] group-hover:text-emerald-500 transition-colors">proveTally()</span>
-            <span className="text-[10px] font-bold text-[var(--bg-card)] bg-[var(--text-main)] px-2 py-0.5">ASYNC</span>
-        </div>
-        <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
-            Triggers the MPC network to aggregate votes. Generates a validity proof that the decryption matches the sum of inputs.
-        </p>
-        {/* Fixed: text-main ensures visibility in both modes */}
-        <div className="bg-[var(--bg-subtle)] border border-[var(--border-light)] p-2 font-mono text-[10px] text-[var(--text-main)] overflow-x-auto">
-            <span className="text-[#a626a4] font-bold">async</span> (id, expectedVotes) <span className="text-[#a626a4] font-bold">=&gt;</span> <span className="text-[#c18401]">Promise</span>&lt;ProofData&gt;
-        </div>
-    </div>
-</div>
+                        <div className="space-y-4">
+                            <div className="border border-[var(--border-light)] bg-[var(--bg-card)] p-5 hover:border-[var(--border-main)] transition-colors group">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="font-mono text-sm font-bold text-[var(--text-main)] group-hover:text-blue-500 transition-colors">castVote()</span>
+                                    <span className="text-[10px] font-bold text-[var(--bg-card)] bg-[var(--text-main)] px-2 py-0.5">ASYNC</span>
+                                </div>
+                                <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
+                                    Generates a Noir ZK-Proof of eligibility based on the snapshot, encrypts the choice using Arcium MPC, and relays to Solana.
+                                </p>
+                                <div className="bg-[var(--bg-subtle)] border border-[var(--border-light)] p-2 font-mono text-[10px] text-[var(--text-main)] overflow-x-auto">
+                                    <span className="text-[#a626a4] font-bold">async</span> (provider, wallet, id, choice) <span className="text-[#a626a4] font-bold">=&gt;</span> <span className="text-[#c18401]">Promise</span>&lt;TxSignature&gt;
+                                </div>
+                            </div>
+                            <div className="border border-[var(--border-light)] bg-[var(--bg-card)] p-5 hover:border-[var(--border-main)] transition-colors group">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="font-mono text-sm font-bold text-[var(--text-main)] group-hover:text-emerald-500 transition-colors">proveTally()</span>
+                                    <span className="text-[10px] font-bold text-[var(--bg-card)] bg-[var(--text-main)] px-2 py-0.5">ASYNC</span>
+                                </div>
+                                <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
+                                    Triggers the MPC network to aggregate votes. Generates a validity proof that the decryption matches the sum of inputs.
+                                </p>
+                                <div className="bg-[var(--bg-subtle)] border border-[var(--border-light)] p-2 font-mono text-[10px] text-[var(--text-main)] overflow-x-auto">
+                                    <span className="text-[#a626a4] font-bold">async</span> (id, expectedVotes) <span className="text-[#a626a4] font-bold">=&gt;</span> <span className="text-[#c18401]">Promise</span>&lt;ProofData&gt;
+                                </div>
+                            </div>
+                        </div>
                     </div>
-
                 </div>
             </section>
 

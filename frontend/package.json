@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite",
     "build": "vite build",
     "test": "yarn build && playwright test browser.test.ts"
   },
   "dependencies": {
     "@arcium-hq/client": "^0.6.2",
-    "@aztec/bb.js": "3.0.0-nightly.20260102",
+    "@aztec/bb.js": "^3.0.0-nightly.20260102",
     "@coral-xyz/anchor": "^0.32.1",
     "@noir-lang/noir_js": "1.0.0-beta.15",
     "@solana/spl-token": "^0.4.14",
@@ -23,7 +24,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "shiki": "^3.21.0",
-    "svrn-sdk": "file:../sdk",
+    "svrn-sdk": "../sdk",
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {

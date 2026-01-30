@@ -17,7 +17,7 @@ import {
 dotenv.config();
 
 // 1. CONFIGURATION
-const SOLVOTE_ID = new PublicKey("Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU");
+const SOLVOTE_ID = new PublicKey("2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg");
   // Arcium MXE Program ID (deployed with arcium deploy)
   const ARCIUM_ID = new PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
 
@@ -65,8 +65,9 @@ async function main() {
     console.log("🗳️  STARTING LIVE ELECTION TALLY...");
 
     // 2. SETUP
-    // Support Helius RPC via environment variable, fallback to public devnet
-    const rpcUrl = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
+    // Support Helius RPC via environment variable, fallback to localnet for testing
+    // const rpcUrl = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
+    const rpcUrl = "http://127.0.0.1:8899"; // Hardcoded for local testing
     const connection = new Connection(rpcUrl, "confirmed");
     const keypairData = JSON.parse(fs.readFileSync('./relayer-keypair.json', 'utf-8'));
     const keypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
@@ -238,7 +239,7 @@ async function main() {
         try {
             // Reconstruct Proposal PDA
             const [proposalPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from("proposal"), new BN(1).toArrayLike(Buffer, "le", 8)], // Assuming ID 1 for tally
+                [Buffer.from("svrn_v5"), new BN(1).toArrayLike(Buffer, "le", 8)], // Assuming ID 1 for tally
                 SOLVOTE_ID
             );
 

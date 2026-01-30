@@ -23,21 +23,21 @@ export interface ProposalMetadata {
 export class SvrnApi {
     constructor(private baseUrl: string) {}
 
-    // --- UPDATED: Accepts Metadata ---
-    async initializeSnapshot(proposalId: number, votingMint: string, metadata?: ProposalMetadata) {
+    // --- UPDATED: Accepts Creator Argument ---
+    async initializeSnapshot(proposalId: number, votingMint: string, metadata?: ProposalMetadata, creator?: string) {
+        console.log("SDK SENDING:", { proposalId, votingMint, creator });
         return this.post('initialize-snapshot', { 
             proposalId, 
             votingMint,
-            metadata // Relayer will save this to DB
+            metadata,
+            creator // <--- THIS MUST BE SENT TO THE RELAYER
         });
     }
 
-    // --- NEW: Asks the relayer for the next available ID ---
     async getNextProposalId(): Promise<{ nextId: number; success: boolean; }> {
         return this.get('next-proposal-id');
     }
 
-    // --- NEW: Fetch Proposal + Metadata ---
     async getProposal(proposalId: number) {
         return this.get(`proposal/${proposalId}`);
     }
@@ -75,7 +75,6 @@ export class SvrnApi {
         return await res.json();
     }
 
-    // --- NEW: Simple GET helper ---
     private async get(endpoint: string) {
         const res = await fetch(`${this.baseUrl}/${endpoint}`);
         return await res.json();

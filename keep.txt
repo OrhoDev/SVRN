@@ -28,7 +28,7 @@ try {
 
 const PORT = 3000;
 const RPC_URL = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
-const PROGRAM_ID = new PublicKey("AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv"); 
+const PROGRAM_ID = new PublicKey("Dqz71XrFd9pnt5yJd83pnQje5gkSyCEMQh3ukF7iXjvU"); 
 
 const keypairData = JSON.parse(fs.readFileSync('./relayer-keypair.json', 'utf-8'));
 const relayerWallet = Keypair.fromSecretKey(new Uint8Array(keypairData));
@@ -171,8 +171,8 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
     try {
         if (!bb) return res.status(503).json({ error: "ZK Backend initializing..." });
         
-        // UPDATED: Now destructuring metadata and creator only
-        const { votingMint, proposalId, metadata, creator } = req.body;
+        // UPDATED: Now destructuring metadata to save it
+        const { votingMint, proposalId, metadata } = req.body;
         const propKey = proposalId.toString(); 
 
         const response = await fetch(RPC_URL, {
@@ -186,19 +186,8 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
 
         const data: any = await response.json();
         const accounts = data.result?.token_accounts || [];
-        let voters = accounts.map((acc: any) => ({ owner: acc.owner, balance: Number(acc.amount) }))
+        const voters = accounts.map((acc: any) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v: any) => v.balance > 0).slice(0, 8); 
-
-        // PRODUCTION MODE: Only use actual token holders
-        if (creator) {
-            const creatorInVoters = voters.find((v: any) => v.owner === creator);
-            if (!creatorInVoters) {
-                console.log(`❌ PRODUCTION MODE: Creator ${creator.slice(0,6)}... has no voting tokens`);
-                // Don't add them - they must have tokens to vote
-            } else {
-                console.log(`✅ PRODUCTION MODE: Creator ${creator.slice(0,6)}... has voting tokens`);
-            }
-        }
 
         if (voters.length === 0) throw new Error("No token holders found.");
 
@@ -257,79 +246,6 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
     }
 });
 
-// --- DEMO ENDPOINT: Add creator to existing voting tree ---
-app.post('/demo-add-creator', async (req: Request, res: Response) => {
-    try {
-        const { proposalId, creator } = req.body;
-        const propKey = proposalId.toString();
-        
-        if (!SNAPSHOT_DB[propKey]) {
-            return res.status(404).json({ success: false, error: "Proposal not found" });
-        }
-        
-        const snapshot = SNAPSHOT_DB[propKey];
-        const creatorInVoters = snapshot.voterMap[creator];
-        
-        if (creatorInVoters) {
-            return res.json({ success: true, message: "Creator already in voting tree" });
-        }
-        
-        console.log(`🔧 DEMO: Rebuilding Merkle tree to include creator ${creator.slice(0,6)}...`);
-        
-        // Add creator with minimum balance (1 token) for voting rights
-        const secretVal = deriveSecret(creator);
-        const weight = 1; // sqrt(1) = 1
-        const leaf = await noirHash(secretVal, weight);
-        
-        // Add to voterMap
-        const creatorIndex = Object.keys(snapshot.voterMap).length;
-        snapshot.voterMap[creator] = {
-            index: creatorIndex,
-            balance: 1,
-            weight: weight,
-            secret: "0x" + secretVal.toString(16).padStart(64, '0'),
-            leaf: leaf.toString()
-        };
-        
-        // REBUILD THE MERKLE TREE with the new leaf
-        const voters = Object.values(snapshot.voterMap);
-        const leavesFr: Fr[] = voters.map((v: any) => {
-            const clean = v.leaf.toString().replace('0x', '');
-            return Fr.fromString(clean);
-        });
-        
-        // Pad to power of 2 if needed
-        const zeroLeaf = await noirHash(0, 0);
-        while (leavesFr.length < 8) leavesFr.push(zeroLeaf);
-        
-        // Rebuild levels
-        const levels: string[][] = [leavesFr.map(f => f.toString())];
-        let currentLevel: Fr[] = leavesFr;
-        
-        while (currentLevel.length > 1) {
-            const nextLevelFr: Fr[] = [];
-            for (let i = 0; i < currentLevel.length; i += 2) {
-                const parent = await noirHash(currentLevel[i], currentLevel[i+1]);
-                nextLevelFr.push(parent);
-            }
-            currentLevel = nextLevelFr;
-            levels.push(currentLevel.map(f => f.toString()));
-        }
-        
-        // Update the snapshot with new tree
-        const newRoot = levels[levels.length - 1][0];
-        snapshot.root = newRoot;
-        snapshot.levels = levels;
-        
-        console.log(`🔧 DEMO: Rebuilt tree. New root: ${newRoot.slice(0, 16)}...`);
-        res.json({ success: true, message: "Creator added and tree rebuilt", root: newRoot });
-        
-    } catch (e: any) {
-        console.error("DEMO_ADD_CREATOR_ERROR:", e.message);
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
-
 // ==========================================
 // 2. PROOF GENERATION (Voting)
 // ==========================================
@@ -364,8 +280,7 @@ app.post('/relay-vote', async (req: Request, res: Response) => {
     try {
         const { nullifier, ciphertext, pubkey, nonce, proposalId } = req.body;
         const proposalBn = new anchor.BN(proposalId);
-        // SYNCED SEED: svrn_v5
-        const [proposalPda] = PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+        const [proposalPda] = PublicKey.findProgramAddressSync([Buffer.from("svrn_prop"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
         const [nullifierPda] = PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
 
         // Helpful debug prints for explorer verification

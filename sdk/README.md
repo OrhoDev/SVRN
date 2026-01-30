@@ -16,7 +16,7 @@ npm install @svrn/sdk
 import { SvrnClient } from '@svrn/sdk';
 
 // Initialize the client
-const svrn = new SvrnClient('http://localhost:3000', 'https://api.devnet.solana.com');
+const svrn = new SvrnClient('http://localhost:3000', 'http://127.0.0.1:8899'); // Use localnet for testing
 
 // Initialize ZK backend (must be called once)
 await svrn.init(circuitJson); // Pass compiled Noir circuit JSON

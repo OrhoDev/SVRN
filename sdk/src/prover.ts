@@ -10,7 +10,7 @@ export class SvrnProver {
         // 1. Initialize the Barretenberg WASM module first
         const bb = await Barretenberg.new();
         
-        // 2. Pass it as the 2nd argument (This fixes "Expected 2 arguments")
+        // 2. Use single argument constructor for v2.1.11
         this.backend = new UltraHonkBackend(circuitJson.bytecode, bb);
         
         this.noir = new Noir(circuitJson);

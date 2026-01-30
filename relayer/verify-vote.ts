@@ -2,8 +2,9 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import * as fs from 'fs';
 
-const PROGRAM_ID = new PublicKey("4Yg7QBY94QFH48C9z3114SidMKHqjT2xVMTFnM6fCo9Q");
-const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+const PROGRAM_ID = new PublicKey("2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg");
+// const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+const connection = new Connection("http://127.0.0.1:8899", "confirmed"); // Hardcoded for local testing
 
 async function verifyVote(proposalId: number) {
     console.log(`\n🔍 Verifying Proposal #${proposalId}...\n`);
@@ -13,7 +14,7 @@ async function verifyVote(proposalId: number) {
     
     // Derive proposal PDA
     const [proposalPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("proposal"), new BN(proposalId).toArrayLike(Buffer, "le", 8)],
+        [Buffer.from("svrn_v5"), new BN(proposalId).toArrayLike(Buffer, "le", 8)],
         PROGRAM_ID
     );
     
@@ -85,7 +86,7 @@ async function verifyVote(proposalId: number) {
         // Try raw read
         if (accountInfo.data.length >= 24) {
             const voteCountBytes = accountInfo.data.slice(16, 24);
-            const voteCount = new BN(voteCountBytes, 'le', 8);
+            const voteCount = new BN(voteCountBytes, 'le');
             console.log(`\n📊 Raw Data Read:`);
             console.log("   Vote Count:", voteCount.toNumber());
             

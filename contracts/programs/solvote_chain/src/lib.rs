@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use anchor_spl::token::{self, Mint, TokenAccount, Token, TransferChecked};
 use anchor_spl::associated_token::AssociatedToken;
 
-declare_id!("2RX9HvFrhMFo7umHzcKHHzy298PA56v3K7hJgEEv5wCX"); 
+declare_id!("AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv"); 
 
 #[program]
 pub mod solvote_chain {
@@ -45,9 +45,6 @@ pub mod solvote_chain {
         Ok(())
     }
 
-    // --- FEATURE 2: ZK TALLY VERIFICATION & EXECUTION ---
-    // This replaces the old set_tally / finalize_execution flow.
-    // It verifies the math provided by the Relayer's ZK Proof before moving funds.
     pub fn finalize_proposal(
         ctx: Context<FinalizeProposal>,
         proof: Vec<u8>,
@@ -59,28 +56,21 @@ pub mod solvote_chain {
         let proposal = &mut ctx.accounts.proposal;
         require!(!proposal.is_executed, ErrorCode::AlreadyExecuted);
 
-        // 1. MOCK PROOF VERIFICATION
-        // In a production environment, we would call a Verifier Program via CPI here.
-        // For this hackathon demo, we check that a non-empty proof was submitted.
+        // 1. Check Proof Presence
         require!(proof.len() > 0, ErrorCode::InvalidProof);
 
-        // 2. ENFORCE GOVERNANCE LOGIC (On-Chain)
-        // We replicate the constraints of the ZK Circuit to ensure the inputs are valid.
+        // 2. Logic Checks
         let total_votes = yes_votes.checked_add(no_votes).unwrap();
-        
-        // Quorum Check
         require!(total_votes >= quorum, ErrorCode::QuorumNotMet);
 
-        // Majority Check (Yes% >= Threshold%)
-        // yes * 100 >= total * threshold
         let lhs = yes_votes.checked_mul(100).unwrap();
         let rhs = total_votes.checked_mul(threshold).unwrap();
         require!(lhs >= rhs, ErrorCode::MajorityNotMet);
 
-        // 3. EXECUTE TREASURY TRANSFER (CPI)
+        // 3. Execution (Legacy Token Transfer)
         let proposal_id_bytes = proposal.proposal_id.to_le_bytes();
         let seeds = &[
-            b"svrn_prop", 
+            b"svrn_v5".as_ref(), 
             proposal_id_bytes.as_ref(),
             &[ctx.bumps.proposal],
         ];
@@ -97,10 +87,9 @@ pub mod solvote_chain {
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
     
         let decimals = ctx.accounts.treasury_mint.decimals;
-        token_interface::transfer_checked(cpi_ctx, proposal.execution_amount, decimals)?;
+        token::transfer_checked(cpi_ctx, proposal.execution_amount, decimals)?;
     
-        // Update State
-        proposal.tally_result = 1; // Passed
+        proposal.tally_result = 1; 
         proposal.is_executed = true;
         
         msg!("DAO::ZK_FINALIZE >> Proof Verified. Execution Complete.");
@@ -117,7 +106,7 @@ pub struct InitProposal<'info> {
         init,
         payer = authority,
         space = 8 + 8 + 8 + 32 + 32 + 32 + 8 + 32 + 32 + 32 + 1 + 1 + 64,
-        seeds = [b"svrn_prop", proposal_id.to_le_bytes().as_ref()],
+        seeds = [b"svrn_v5", proposal_id.to_le_bytes().as_ref()],
         bump
     )]
     pub proposal: Account<'info, Proposal>,
@@ -127,20 +116,20 @@ pub struct InitProposal<'info> {
         payer = authority,
         associated_token::mint = treasury_mint,
         associated_token::authority = proposal,
-        associated_token::token_program = token_program
+        // Legacy Token Program is implied by the type Account<'info, TokenAccount>
     )]
-    pub proposal_token_account: InterfaceAccount<'info, TokenAccount>, 
+    pub proposal_token_account: Account<'info, TokenAccount>, 
 
-    pub voting_mint: InterfaceAccount<'info, Mint>,   
-    pub treasury_mint: InterfaceAccount<'info, Mint>, 
+    pub voting_mint: Account<'info, Mint>,   
+    pub treasury_mint: Account<'info, Mint>, 
 
-    /// CHECK: Recipient address for the execution funds.
+    /// CHECK: Recipient address
     pub target_wallet: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    pub token_program: Interface<'info, TokenInterface>, 
+    pub token_program: Program<'info, Token>, // Strict Legacy Token Program
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
@@ -150,7 +139,7 @@ pub struct InitProposal<'info> {
 pub struct FinalizeProposal<'info> {
     #[account(
         mut,
-        seeds = [b"svrn_prop", proposal.proposal_id.to_le_bytes().as_ref()],
+        seeds = [b"svrn_v5", proposal.proposal_id.to_le_bytes().as_ref()],
         bump,
         has_one = authority,
         has_one = target_wallet,
@@ -163,22 +152,22 @@ pub struct FinalizeProposal<'info> {
         associated_token::mint = treasury_mint,
         associated_token::authority = proposal
     )]
-    pub proposal_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub proposal_token_account: Account<'info, TokenAccount>,
 
     #[account(
         mut,
         associated_token::mint = treasury_mint,
         associated_token::authority = target_wallet
     )]
-    pub target_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub target_token_account: Account<'info, TokenAccount>,
 
-    /// CHECK: Destination wallet verified by the Proposal account state.
+    /// CHECK: Destination
     pub target_wallet: UncheckedAccount<'info>,
 
-    pub treasury_mint: InterfaceAccount<'info, Mint>,
+    pub treasury_mint: Account<'info, Mint>,
 
-    pub authority: Signer<'info>, // Relayer pays for finalization
-    pub token_program: Interface<'info, TokenInterface>,
+    pub authority: Signer<'info>, 
+    pub token_program: Program<'info, Token>, // Strict Legacy
 }
 
 #[derive(Accounts)]
@@ -198,30 +187,6 @@ pub struct SubmitVote<'info> {
     pub relayer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
-
-// Deprecated contexts (kept to avoid breaking old IDL if needed, but logic moved to FinalizeProposal)
-#[derive(Accounts)]
-pub struct ExecuteProposal<'info> {
-    #[account(mut)]
-    pub proposal: Account<'info, Proposal>,
-    #[account(mut)]
-    pub proposal_token_account: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut)]
-    pub target_token_account: InterfaceAccount<'info, TokenAccount>,
-    /// CHECK: Old check
-    pub target_wallet: UncheckedAccount<'info>,
-    pub treasury_mint: InterfaceAccount<'info, Mint>,
-    pub authority: Signer<'info>,
-    pub token_program: Interface<'info, TokenInterface>,
-}
-#[derive(Accounts)]
-pub struct SetTally<'info> {
-    #[account(mut)]
-    pub proposal: Account<'info, Proposal>,
-    pub authority: Signer<'info>,
-}
-
-// --- STATE ---
 
 #[account]
 pub struct Proposal {

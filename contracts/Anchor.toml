@@ -6,14 +6,14 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-solvote_chain = "2RX9HvFrhMFo7umHzcKHHzy298PA56v3K7hJgEEv5wCX"
+solvote_chain = "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "devnet"
-wallet = "~/.config/solana/id.json"
+wallet = "/home/dev0/.config/solana/id.json"
 
 [scripts]
 init-proposal = "yarn run ts-node scripts/init_proposal.ts"
