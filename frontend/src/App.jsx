@@ -23,7 +23,9 @@ import {
 } from 'lucide-react';
 
 // --- CONSTANTS ---
-const PROGRAM_ID = new PublicKey("AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
+const PROGRAM_ID = new PublicKey(import.meta.env.VITE_PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
+const THRESHOLD_REQ = parseInt(import.meta.env.VITE_THRESHOLD_REQ) || 51; // 51% threshold for proposal approval
+const QUORUM_REQ = parseInt(import.meta.env.VITE_QUORUM_REQ) || 10;   // Minimum 10 votes required for validity
 
 // --- COMPONENTS ---
 
@@ -41,81 +43,95 @@ const CopyButton = ({ text }) => {
     );
 };
 
-// Advanced Syntax Highlighter for VS Code look
+// Clean syntax highlighter for IDE-style execution
 const SyntaxHighlight = ({ code }) => {
-    // Regex to split code into tokens
-    const parts = code.split(/(\b(?:const|await|import|require|new|async|from|return|function|if|else|throw|try|catch|finally)\b|\/\/.*|"[^"]*"|'[^']*'|\d+|[{}()[\].;,]|\b[A-Z][a-zA-Z0-9_]*\b)/g);
+    // Simple tokenization for VS Code Dark+ theme
+    const parts = code.split(/(\b(?:const|await|import|from|return|function|if|else|new|async)\b|\/\/.*|"[^"]*"|'[^']*'|`[^`]*`|\d+|[{}()[\].;,]|[A-Z][a-zA-Z0-9_]*\b|[a-z][a-zA-Z0-9_]*(?=\())\b/g);
     
     return (
         <span className="font-mono text-[13px] leading-6">
             {parts.map((part, i) => {
                 if (!part) return null;
-                // Keywords (Purple)
-                if (/^(const|await|import|require|new|async|from|return|function|if|else|throw|try|catch|finally)$/.test(part)) 
-                    return <span key={i} className="text-[#a626a4] font-bold">{part}</span>;
-                // Comments (Grey)
-                if (part.startsWith('//')) 
-                    return <span key={i} className="text-[#a0a1a7] italic">{part}</span>;
-                // Strings (Green)
-                if (part.startsWith('"') || part.startsWith("'")) 
-                    return <span key={i} className="text-[#50a14f]">{part}</span>;
-                // Numbers (Orange)
-                if (/^\d+$/.test(part)) 
-                    return <span key={i} className="text-[#986801]">{part}</span>;
-                // Classes/Types (Yellow/Gold)
-                if (/^[A-Z][a-zA-Z0-9_]*$/.test(part))
-                    return <span key={i} className="text-[#e5c07b]">{part}</span>;
-                // Functions/Methods (Blue - simple heuristic)
-                if (parts[i+1] === '(')
-                    return <span key={i} className="text-[#4078f2]">{part}</span>;
                 
-                // Default
-                return <span key={i} className="text-[#383a42]">{part}</span>;
+                // Keywords - blue
+                if (/^(const|await|import|from|return|function|if|else|new|async)$/.test(part)) 
+                    return <span key={i} className="text-[#569cd6]">{part}</span>;
+                
+                // Comments - green
+                if (part.startsWith('//')) 
+                    return <span key={i} className="text-[#6a9955] italic">{part}</span>;
+                
+                // Strings - orange
+                if (part.startsWith('"') || part.startsWith("'") || part.startsWith('`')) 
+                    return <span key={i} className="text-[#ce9178]">{part}</span>;
+                
+                // Numbers - light green
+                if (/^\d+$/.test(part)) 
+                    return <span key={i} className="text-[#b5cea8]">{part}</span>;
+                
+                // Types - cyan
+                if (/^[A-Z][a-zA-Z0-9_]*$/.test(part))
+                    return <span key={i} className="text-[#4ec9b0]">{part}</span>;
+                
+                // Functions - yellow
+                if (/^[a-z][a-zA-Z0-9_]*$/.test(part) && parts[i+1] && parts[i+1].startsWith('('))
+                    return <span key={i} className="text-[#dcdcaa]">{part}</span>;
+                
+                // Default - light gray
+                return <span key={i} className="text-[#d4d4d4]">{part}</span>;
             })}
         </span>
     );
 };
-
+// IDE execution step with integrated explanation
 const IDEEntry = ({ entry, lineStart }) => {
-    // Calculate how many lines this entry takes up
-    const lineCount = entry.code.split('\n').length;
+    const lines = entry.code.split('\n');
     
     return (
-        <div className="group relative hover:bg-black/5 transition-colors -mx-6 px-6 py-2 border-l-4 border-transparent hover:border-blue-400">
-            {/* API Badge (Floating top right) */}
-            {entry.api && (
-                <div className="absolute right-4 top-2 opacity-50 text-[10px] font-mono font-bold bg-[#e5e5e6] px-2 py-0.5 rounded text-[#383a42] uppercase tracking-wider">
-                    {entry.api}
-                </div>
-            )}
+        <div className="mb-4">
+            {/* EXPLANATION BLOCK - Simple terminal-style */}
+            <div className="bg-[#2d2d2d] border border-[#3e3e42] px-4 py-2 mb-1">
+                <p className="text-[#cccccc] text-sm font-mono leading-relaxed">
+                    {entry.title.replace(/^\d+\.\s*/, '')}
+                </p>
+            </div>
 
-            <div className="flex">
-                {/* Line Numbers */}
-                <div className="w-8 flex-shrink-0 flex flex-col items-end pr-3 select-none text-[13px] leading-6 text-[#9ca3af]">
-                    {Array.from({ length: lineCount }).map((_, i) => (
-                        <div key={i}>{lineStart + i}</div>
-                    ))}
-                </div>
-
-                {/* Code Content */}
-                <div className="flex-1 overflow-x-auto custom-scrollbar">
-                    <SyntaxHighlight code={entry.code} />
-                    
-                    {/* Result / Output Area */}
-                    {entry.result && (
-                        <div className="mt-2 mb-1 p-2 bg-[#fafafa] border-l-2 border-emerald-500 text-[11px] font-mono text-[#383a42] flex items-start gap-2 shadow-sm">
-                            <ArrowRight size={12} className="mt-[3px] text-emerald-600 flex-shrink-0"/> 
-                            <div className="flex flex-col gap-1 w-full">
-                                <span className="break-all font-semibold">{entry.result}</span>
-                                {entry.tx && (
-                                    <a href={`https://explorer.solana.com/tx/${entry.tx}?cluster=devnet`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-blue-600 hover:underline mt-1 font-bold">
-                                        View Transaction <ExternalLink size={10} />
-                                    </a>
-                                )}
-                            </div>
+            {/* CODE BLOCK */}
+            <div className="bg-[#252525] border border-[#3e3e42]">
+                {lines.map((line, i) => (
+                    <div key={i} className="flex border-b border-[#2d2d30] last:border-b-0">
+                        {/* Line number */}
+                        <div className="w-12 text-right pr-3 py-1 bg-[#2d2d2d] text-xs text-[#858585] font-mono select-none">
+                            {lineStart + i}
                         </div>
-                    )}
-                </div>
+                        {/* Code line */}
+                        <div className="flex-1 px-4 py-1 font-mono text-[13px] leading-6">
+                            <SyntaxHighlight code={line} />
+                        </div>
+                    </div>
+                ))}
+
+                {/* RESULT BLOCK */}
+                {entry.result && (
+                    <div className="flex bg-[#2d2d30] border-t border-[#3e3e42]">
+                        <div className="w-12 text-right pr-3 py-1 bg-[#2d2d2d] text-xs text-[#6a9955] font-mono select-none">
+                            {lineStart + lines.length}
+                        </div>
+                        <div className="flex-1 px-4 py-1 font-mono text-sm text-[#6a9955] flex items-center gap-3">
+                            <span>// {entry.result}</span>
+                            {entry.tx && (
+                                <a 
+                                    href={`https://explorer.solana.com/tx/${entry.tx}?cluster=devnet`} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="text-[#4ec9b0] hover:underline text-xs flex items-center gap-1"
+                                >
+                                    View Tx <ExternalLink size={10} />
+                                </a>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -125,12 +141,14 @@ const StatsTicker = () => (
     <div className="border-y-2 border-[var(--border-main)] bg-[var(--bg-card)] py-3 overflow-hidden">
         <div className="flex items-center gap-16 animate-marquee whitespace-nowrap text-xs font-mono font-bold uppercase tracking-widest text-[var(--text-main)]">
             <span className="flex items-center gap-2"><Globe size={14}/> Solana Devnet</span>
+            <span className="flex items-center gap-2"><Database size={14}/> Helius RPC</span>
             <span className="flex items-center gap-2"><Layers size={14}/> Arcium MPC Network</span>
             <span className="flex items-center gap-2"><Lock size={14}/> Noir UltraHonk ZK</span>
             <span className="flex items-center gap-2"><Shield size={14}/> Privacy SDK v1.0</span>
             <span className="flex items-center gap-2"><Database size={14}/> Merklized Census</span>
             {/* Duplicated for scroll */}
             <span className="flex items-center gap-2"><Globe size={14}/> Solana Devnet</span>
+            <span className="flex items-center gap-2"><Database size={14}/> Helius RPC</span>
             <span className="flex items-center gap-2"><Layers size={14}/> Arcium MPC Network</span>
             <span className="flex items-center gap-2"><Lock size={14}/> Noir UltraHonk ZK</span>
             <span className="flex items-center gap-2"><Shield size={14}/> Privacy SDK v1.0</span>
@@ -180,7 +198,7 @@ const Dashboard = () => {
     const [duration, setDuration] = useState(24);
     
     // SDK State
-    const svrn = useMemo(() => new SvrnClient("http://localhost:3000"), []);
+    const svrn = useMemo(() => new SvrnClient(import.meta.env.VITE_RELAYER_URL || "http://localhost:3000"), []);
     const [zkReady, setZkReady] = useState(false);
 
     const [liveVoteCount, setLiveVoteCount] = useState(0);
@@ -303,22 +321,20 @@ await svrn.init(circuit);
             const provider = new AnchorProvider(connection, anchorWallet, {});
 
             addEntry(
-                "1. Initialize Proposal",
+                "The SDK creates your proposal and builds a secure voter snapshot",
                 "createProposal",
-                `// 1. Fetch Next ID & Build Merkle Snapshot
-const proposalId = ${nextProposalId};
+                `const proposalId = ${nextProposalId};
 const mint = new PublicKey("${votingMintStr.slice(0,8)}...");
 
-// 2. Initialize on-chain Proposal (Anchor)
-const { txid } = await svrn.createProposal(
+await svrn.createProposal(
     provider,
     publicKey,
     mint,
     { title: "${propTitle}", duration: ${duration} },
-    0.05, // Gas Buffer
-    proposalId
+    0.05
 );`,
-                "Executing..."
+                "Initializing...",
+                null
             );
 
             const { txid } = await svrn.createProposal(
@@ -340,7 +356,7 @@ const { txid } = await svrn.createProposal(
                         console.log("🔧 DEMO: Creator not in voting tree - adding them manually...");
                         
                         // Call demo endpoint to add creator to voting tree
-                        const response = await fetch(`http://localhost:3000/demo-add-creator`, {
+                        const response = await fetch(`${import.meta.env.VITE_RELAYER_URL || "http://localhost:3000"}/demo-add-creator`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -385,7 +401,7 @@ const { txid } = await svrn.createProposal(
             // Update the last entry with result
             setHistory(prev => {
                 const newH = [...prev];
-                newH[newH.length-1].result = `Success. Proposal #${nextProposalId} on-chain.`;
+                newH[newH.length-1].result = `The SDK creates your proposal and builds a secure voter snapshot`;
                 newH[newH.length-1].tx = txid;
                 return newH;
             });
@@ -403,19 +419,23 @@ const { txid } = await svrn.createProposal(
         if (isLoading || !zkReady || !publicKey || !proposalId) return; 
         setIsLoading(true);
         try {
-            addEntry("2. Cast Private Vote", "castVote", 
-`// 1. Generate Noir ZK Proof (Client-Side)
-// 2. Encrypt Ballot (Arcium MPC)
-// 3. Relay to Solana (Gasless)
+            addEntry("Your vote is encrypted using zero-knowledge proofs before being submitted", "castVote", 
+`const proof = await svrn.prover.generateVoteProof(
+    secret, 
+    voterData, 
+    proposalId
+);
 
-const choice = ${choice}; // ${choice === 1 ? 'YES' : 'NO'}
-const user = "${publicKey.toBase58().slice(0,8)}...";
+const encrypted = await svrn.encryption.encryptVote(
+    provider, 
+    choice, 
+    votingWeight
+);
 
-await svrn.castVote(
-  provider, 
-  user, 
-  ${proposalId}, 
-  choice
+await svrn.api.submitVote(
+    proposalId, 
+    nullifier, 
+    encrypted
 );`, "Generating Zero-Knowledge Proof...");
 
             const provider = new AnchorProvider(connection, anchorWallet, {});
@@ -428,7 +448,7 @@ await svrn.castVote(
 
             setHistory(prev => {
                 const newH = [...prev];
-                newH[newH.length-1].result = `Confirmed. Nullifier Verified on-chain.`;
+                newH[newH.length-1].result = `Your encrypted vote is submitted and verified on-chain`;
                 newH[newH.length-1].tx = result.tx;
                 return newH;
             });
@@ -437,12 +457,14 @@ await svrn.castVote(
         } catch (e) { 
             // SPECIAL FEATURE SHOWCASE: DOUBLE VOTING
             if (e.message.includes("Allocate: account Address") || e.message.includes("0x0")) {
-                addEntry("Security Protocol", "Nullifier Check", 
-`// Checking Nullifier PDA against Ledger...
+                addEntry("The system prevents double voting while protecting your identity", "Security Protocol", 
+`// Each vote creates a unique nullifier hash
+// This prevents double voting without
+// revealing the voter's identity
+
 if (nullifierExists(userNullifier)) {
-    throw new SecurityError("Double Voting Detected");
-}`, 
-                "✅ SECURITY SUCCESS: Double-Voting Attempt Blocked. Identity Protected.");
+    throw new Error("Vote already cast");
+}`, "✅ Security Success: Double-voting prevented while preserving privacy");
             } else {
                 console.error(e);
                 alert("Vote Failed: " + e.message); 
@@ -454,45 +476,68 @@ if (nullifierExists(userNullifier)) {
     // 3. TALLY
     const handleTally = async () => {
         if (isLoading || !proposalId) return;
-        setIsLoading(true);
-        try {
-            const QUORUM_REQ = 0; 
-            const THRESHOLD_REQ = 0;
 
-            addEntry("3. Verifiable Tally", "proveTally", 
-`// 1. Aggregates Encrypted Votes (MPC)
-// 2. Generates Validity Proof (Noir ZK)
-// 3. Unlocks Treasury (Atomic Execution)
+        addEntry("The encrypted votes are tallied and results are proven on-chain", "proveTally", 
+`const tallyProof = await svrn.api.proveTally(
+    proposalId,
+    yesVotes,
+    noVotes, 
+    threshold,
+    quorum
+);
 
-const result = await svrn.api.proveTally({ 
-  proposalId: ${proposalId},
-  yes: ${myVoteWeight}, // Demo Weight
-  quorum: ${QUORUM_REQ} 
-});`, "Verifying ZK Validity Proof...");
+// ZK proof ensures correctness while
+// preserving individual vote privacy
+console.log('Tally verified:', tallyProof.success);`, "Proving election results...");
 
-            const res = await svrn.api.proveTally(
-                proposalId, 
-                myVoteWeight, 
-                0, 
-                THRESHOLD_REQ, 
-                QUORUM_REQ
-            );
-            
-            if (!res.success) throw new Error(res.error);
+    try {
+        // First get the actual vote counts
+        const voteCounts = await svrn.api.getVoteCounts(proposalId);
+        if (!voteCounts.success) throw new Error("Failed to get vote counts");
+        
+        const res = await svrn.api.proveTally(
+            proposalId, 
+            voteCounts.yesVotes,
+            voteCounts.noVotes, 
+            THRESHOLD_REQ, 
+            QUORUM_REQ
+        );
+        
+        if (!res.success) throw new Error(res.error);
 
-            setHistory(prev => {
-                const newH = [...prev];
-                newH[newH.length-1].result = `Proof Validated! \nZK Proof: ${res.proof.slice(0,16)}...`;
-                if(res.tx && !res.tx.includes("Skipped")) newH[newH.length-1].tx = res.tx;
-                return newH;
-            });
-
+        setHistory(prev => {
+            const newH = [...prev];
+            newH[newH.length-1].result = `The encrypted votes are tallied and results are proven on-chain`;
+            if(res.tx && !res.tx.includes("Skipped")) newH[newH.length-1].tx = res.tx;
+            return newH;
+        });
         } catch (e) { alert(e.message); } 
         finally { setIsLoading(false); }
     };
 
-    // Helper to calculate line numbers
-    let currentLine = 1;
+    // Auto-scroll to bottom when new entries are added (IDE only)
+    useEffect(() => {
+        const traceElement = document.getElementById('execution-trace');
+        if (traceElement && history.length > 0) {
+            // Multiple attempts to ensure scroll works
+            const scrollToBottom = () => {
+                traceElement.scrollTop = traceElement.scrollHeight;
+            };
+            
+            // Immediate scroll
+            scrollToBottom();
+            
+            // Delayed scroll (content might need time to render)
+            setTimeout(scrollToBottom, 100);
+            setTimeout(scrollToBottom, 300);
+            
+            // Use requestAnimationFrame for smooth scroll
+            requestAnimationFrame(scrollToBottom);
+        }
+    }, [history]);
+
+    // Calculate current line for status bar
+    const currentLine = history.reduce((acc, prev) => acc + prev.code.split('\n').length + (prev.result ? 1 : 0), 2);
 
     return (
         <div className={`min-h-screen font-sans overflow-x-hidden ${darkMode ? 'dark-mode' : ''}`} style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}>
@@ -620,7 +665,7 @@ const result = await svrn.api.proveTally({
         </div>
 
         {/* RESPONSIVE GRID WRAPPER */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 border-2 border-[var(--border-main)] shadow-[12px_12px_0px_var(--shadow-color)] bg-[var(--bg-card)] h-auto lg:h-[720px] overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 border-2 border-[var(--border-main)] shadow-[12px_12px_0px_var(--shadow-color)] bg-[var(--bg-card)] h-auto lg:h-[800px] overflow-hidden">
             
             {/* LEFT PANEL: CONFIGURATION */}
             <div className="lg:col-span-5 p-8 border-b lg:border-b-0 lg:border-r-2 border-[var(--border-main)] flex flex-col gap-6 bg-[var(--bg-card)] overflow-y-auto custom-scrollbar">
@@ -689,7 +734,7 @@ const result = await svrn.api.proveTally({
                     </div>
                 </div>
 
-                <hr className="border-dashed border-[var(--border-light)] my-2"/>
+                <hr className="border-t border-gray-300 my-2"/>
 
                 {/* 2. VOTE */}
                 <div className={`relative transition-opacity ${!proposalId ? 'opacity-40' : 'opacity-100'}`}>
@@ -705,10 +750,7 @@ const result = await svrn.api.proveTally({
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        {/* Debug info */}
-                        <div className="col-span-2 text-xs text-gray-500 mb-2">
-                            Debug: zkReady={String(zkReady)} | isSnapshotReady={String(isSnapshotReady)} | isLoading={String(isLoading)}
-                        </div>
+                        {/* Removed debug text */}
                         <button onClick={() => handleVote(1)} disabled={!isSnapshotReady || isLoading || !zkReady} className="retro-btn py-5 font-black text-sm">YES</button>
                         <button onClick={() => handleVote(0)} disabled={!isSnapshotReady || isLoading || !zkReady} className="retro-btn py-5 font-black text-sm">NO</button>
                     </div>
@@ -718,7 +760,7 @@ const result = await svrn.api.proveTally({
                     </div>
                 </div>
 
-                <hr className="border-dashed border-[var(--border-light)] my-2"/>
+                <hr className="border-t-2 border-gray-400 my-2"/>
 
                 {/* 3. TALLY */}
                 <div className="relative">
@@ -731,53 +773,82 @@ const result = await svrn.api.proveTally({
                 </div>
             </div>
 
-            {/* RIGHT PANEL (IDE): VS CODE STYLE */}
-            <div className="lg:col-span-7 bg-[#ffffff] flex flex-col h-[500px] lg:h-full relative border-t-2 lg:border-t-0 border-[var(--border-main)] font-mono text-sm">
-                {/* Tabs */}
-                <div className="h-9 border-b border-[#e1e4e8] bg-[#f0f0f0] flex items-end px-0 select-none">
-                    <div className="bg-[#ffffff] border-t-2 border-t-blue-500 border-r border-[#e1e4e8] px-4 py-2 text-[11px] text-[#383a42] flex items-center gap-2 h-full">
-                        <FileCode size={12} className="text-blue-500"/> implementation.ts
+            {/* RIGHT PANEL: VS CODE IDE WITH NARRATIVE */}
+            <div className="lg:col-span-7 bg-[#252525] flex flex-col h-[600px] lg:h-[800px] relative border-t-2 lg:border-t-0 border-[var(--border-main)] font-mono text-sm shadow-2xl">
+                {/* VS Code Tab Bar */}
+                <div className="h-9 bg-[#252526] flex items-end px-0 select-none overflow-hidden border-b border-[#1e1e1e]">
+                    {/* Active Tab */}
+                    <div className="bg-[#1e1e1e] px-4 py-2 text-[13px] text-[#ffffff] flex items-center gap-2 h-full min-w-[140px] border-t-2 border-t-[#007acc]">
+                        <FileCode size={14} className="text-[#e5c07b]"/> 
+                        <span>execution_trace.ts</span>
+                        <span className="ml-auto text-[#ffffff]/50 hover:text-white cursor-default">×</span>
+                    </div>
+                    {/* Inactive Tab */}
+                    <div className="bg-[#2d2d2d] px-4 py-2 text-[13px] text-[#969696] flex items-center gap-2 h-full border-r border-[#1e1e1e]/50 cursor-not-allowed">
+                        <FileCode size={14} className="text-[#4ec9b0]"/> 
+                        <span>svrn.d.ts</span>
                     </div>
                 </div>
                 
-                {/* Code Area */}
-                <div className="flex-1 p-0 overflow-y-auto custom-scrollbar bg-white relative">
-                    <div className="flex min-h-full">
-                        {/* IDE Content */}
-                        <div className="w-full pt-4 pb-12">
-                            {/* Empty State / Init */}
-                            {history.length === 0 && (
-                                <div className="px-6 text-[#a0a1a7] italic">
+                {/* Main Code Area with Auto-Scroll */}
+                <div className="flex-1 p-0 overflow-y-auto custom-scrollbar bg-[#252525] relative scroll-smooth min-h-0" id="execution-trace">
+                    {/* IDE Content - Full width to prevent cutoff */}
+                    <div className="w-full pt-2 pb-12">
+                        {/* Empty State */}
+                        {history.length === 0 && (
+                            <div className="flex opacity-60">
+                                <div className="w-12 flex-shrink-0 text-right pr-4 select-none text-[12px] leading-[1.5] text-[#858585]">1</div>
+                                <div className="px-4 text-[#6a9955] italic text-[13px] leading-[1.5]">
                                     // Connecting to Arcium Network...<br/>
                                     // Waiting for SDK initialization...
                                 </div>
-                            )}
+                            </div>
+                        )}
+                        
+                        {/* Render Execution Steps */}
+                        {history.map((entry, i) => {
+                            // Calculate cumulative line numbers
+                            const entryLineStart = history.slice(0, i).reduce((acc, prev) => {
+                                return acc + prev.code.split('\n').length + (prev.result ? 1 : 0);
+                            }, 2);
                             
-                            {/* Render History as Code Blocks */}
-                            {history.map((entry, i) => {
-                                const entryLineStart = currentLine;
-                                currentLine += entry.code.split('\n').length + 1; // +1 for spacing
-                                return <IDEEntry key={i} entry={entry} lineStart={entryLineStart} />;
-                            })}
-                            
-                            {/* Active Cursor */}
-                            <div className="px-6 flex gap-3 mt-1">
-                                <div className="w-8 text-right text-[#9ca3af] text-[13px]">{currentLine}</div>
-                                <div className="w-2 h-5 bg-blue-500/50 animate-pulse"></div>
+                            return <IDEEntry key={i} entry={entry} lineStart={entryLineStart} />;
+                        })}
+                        
+                        {/* Active Cursor */}
+                        <div className="flex mt-2 opacity-50">
+                            <div className="w-12 flex-shrink-0 text-right pr-4 select-none text-[12px] leading-[1.5] text-[#858585]">
+                                {history.reduce((acc, prev) => acc + prev.code.split('\n').length + (prev.result ? 1 : 0), 2)}
+                            </div>
+                            <div className="pl-4">
+                                <div className="w-2 h-5 bg-[#d4d4d4] animate-pulse"></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Status Bar */}
-                <div className="h-6 bg-[#007acc] text-white flex items-center justify-between px-4 text-[10px] font-sans uppercase tracking-tighter z-10">
-                    <div className="flex gap-4">
-                        <span className="font-bold flex items-center gap-1"><GitBranch size={10}/> main*</span>
-                        <span>0 Errors</span>
+                {/* VS Code Status Bar */}
+                <div className="h-6 bg-[#252525] text-[#858585] flex items-center justify-between px-3 text-[11px] font-sans tracking-wide z-10 select-none border-t border-[#3e3e42]">
+                    <div className="flex gap-3 items-center">
+                        <span className="font-medium flex items-center gap-1 px-1.5 py-0.5 rounded cursor-default transition-colors">
+                            <GitBranch size={10}/> main*
+                        </span>
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded cursor-default transition-colors">
+                            <CheckCircle size={10}/> 0 Errors
+                        </span>
                     </div>
-                    <span>TypeScript</span>
+                    <div className="flex gap-3 items-center">
+                        <span className="px-1.5 py-0.5 rounded cursor-default transition-colors">Ln {currentLine}, Col 1</span>
+                        <span className="px-1.5 py-0.5 rounded cursor-default transition-colors">UTF-8</span>
+                        <span className="px-1.5 py-0.5 rounded cursor-default transition-colors">TypeScript</span>
+                        <span className="px-1.5 py-0.5 rounded cursor-default transition-colors flex items-center gap-1">
+                            <Layers size={10}/> SVRN
+                        </span>
+                    </div>
                 </div>
             </div>
+
+
         </div>
     </div>
 </section>
@@ -787,7 +858,7 @@ const result = await svrn.api.proveTally({
     <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
         <h2 className="text-4xl font-black uppercase mb-8 tracking-tighter leading-none text-[var(--text-main)]">Governance in 3 lines of code.</h2>
         
-        <div className="bg-[#282c34] border-4 border-[var(--border-main)] p-8 text-left shadow-[12px_12px_0px_var(--shadow-color)] text-sm md:text-base font-mono leading-relaxed overflow-x-auto rounded-sm text-[#abb2bf]">
+        <div className="bg-[#252525] border-4 border-[var(--border-main)] p-8 text-left shadow-[12px_12px_0px_var(--shadow-color)] text-sm md:text-base font-mono leading-relaxed overflow-x-auto rounded-sm text-[#abb2bf]">
             <div className="mb-4">
                 <span className="text-[#5c6370] italic">// 1. Initialize SVRN Client</span><br/>
                 <span className="text-[#c678dd]">const</span> svrn <span className="text-[#56b6c2]">=</span> <span className="text-[#c678dd]">new</span> <span className="text-[#e5c07b]">SvrnClient</span><span className="text-[#abb2bf]">();</span>

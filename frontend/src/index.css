@@ -8,7 +8,7 @@
 
 /* --- COLOR VARIABLES (Dark/Light) --- */
 :root {
-  --bg-main: #f3f3f3;
+  --bg-main: #f0f0f0; /* Slightly darker */
   --bg-card: #ffffff;
   --bg-subtle: #ebebeb;
   /* Medium-dark gray for Light Mode: Lightened from #1a1a1a to #333 */
@@ -42,6 +42,34 @@ body {
   font-family: 'Space Grotesk', sans-serif;
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* --- IDE SCROLLBAR (Always Visible) --- */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #6a6a6a #252525;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 14px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #252525;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #6a6a6a;
+  border-radius: 7px;
+  border: 2px solid #252525;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #7a7a7a;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: #8a8a8a;
 }
 
 /* --- RETRO BUTTONS --- */

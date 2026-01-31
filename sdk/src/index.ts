@@ -8,7 +8,7 @@ import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import idl from './idl.json' with { type: 'json' };
 import { hexToBytes } from './utils.js';
 
-const PROGRAM_ID = new PublicKey("AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
+const PROGRAM_ID = new PublicKey(process.env.PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
 // LEGACY TOKEN PROGRAM
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");

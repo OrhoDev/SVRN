@@ -66,6 +66,10 @@ export class SvrnApi {
         return this.post('prove-tally', { proposalId, yesVotes, noVotes, threshold, quorum });
     }
 
+    async getVoteCounts(proposalId: number) {
+        return this.get(`vote-counts/${proposalId}`);
+    }
+
     private async post(endpoint: string, body: any) {
         const res = await fetch(`${this.baseUrl}/${endpoint}`, {
             method: 'POST',

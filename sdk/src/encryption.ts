@@ -6,7 +6,7 @@ import { AnchorProvider } from "@coral-xyz/anchor";
 export class SvrnEncryption {
     private programId: PublicKey;
 
-    constructor(programId: string = "DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS") {
+    constructor(programId: string = process.env.ARCIUM_PROGRAM_ID || "DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS") {
         this.programId = new PublicKey(programId);
     }
 
