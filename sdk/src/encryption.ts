@@ -3,7 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Buffer } from "buffer";
 import { AnchorProvider } from "@coral-xyz/anchor";
 
-export class SvrnEncryption {
+export class SolvrnEncryption {
     private programId: PublicKey;
 
     constructor(programId: string = process.env.ARCIUM_PROGRAM_ID || "DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS") {

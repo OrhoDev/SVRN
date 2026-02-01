@@ -1,6 +1,6 @@
-import { SvrnApi, ProposalMetadata } from './api.js';
-import { SvrnProver } from './prover.js';
-import { SvrnEncryption } from './encryption.js';
+import { SolvrnApi, ProposalMetadata } from './api.js';
+import { SolvrnProver } from './prover.js';
+import { SolvrnEncryption } from './encryption.js';
 import { getWalletSecret } from './utils.js';
 import { AnchorProvider, Program } from '@coral-xyz/anchor';
 import BN from 'bn.js';
@@ -8,20 +8,41 @@ import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import idl from './idl.json' with { type: 'json' };
 import { hexToBytes } from './utils.js';
 
-const PROGRAM_ID = new PublicKey(process.env.PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
+let PROGRAM_ID: PublicKey | null = null;
+
+const getProgramId = (): PublicKey => {
+    if (PROGRAM_ID) return PROGRAM_ID;
+    
+    const id = (globalThis as any).process?.env?.PROGRAM_ID || 
+              process.env.PROGRAM_ID;
+    
+    if (!id) {
+        throw new Error("PROGRAM_ID environment variable required. Please set process.env.PROGRAM_ID in your application or pass programId to SolvrnClient constructor.");
+    }
+    
+    PROGRAM_ID = new PublicKey(id);
+    return PROGRAM_ID;
+};
 // LEGACY TOKEN PROGRAM
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
-export class SvrnClient {
-    public api: SvrnApi;
-    public prover: SvrnProver;
-    public encryption: SvrnEncryption;
+export class SolvrnClient {
+    public api: SolvrnApi;
+    public prover: SolvrnProver;
+    public encryption: SolvrnEncryption;
 
-    constructor(relayerUrl: string, arciumProgramId?: string) {
-        this.api = new SvrnApi(relayerUrl);
-        this.prover = new SvrnProver();
-        this.encryption = new SvrnEncryption(arciumProgramId);
+    constructor(relayerUrl: string, arciumProgramId?: string, programId?: string) {
+        // Allow programId to be passed in constructor for flexibility
+        if (programId) {
+            (globalThis as any).process = (globalThis as any).process || {};
+            (globalThis as any).process.env = (globalThis as any).process.env || {};
+            (globalThis as any).process.env.PROGRAM_ID = programId;
+        }
+        
+        this.api = new SolvrnApi(relayerUrl);
+        this.prover = new SolvrnProver();
+        this.encryption = new SolvrnEncryption(arciumProgramId);
     }
 
     public async init(circuitJson: any) {
@@ -60,7 +81,7 @@ export class SvrnClient {
         // PROPOSAL PDA (Synced Seed: svrn_v5)
         const [pda] = PublicKey.findProgramAddressSync(
             [Buffer.from("svrn_v5"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], 
-            PROGRAM_ID
+            getProgramId()
         );
         
         // VAULT PDA (Strict Legacy)
@@ -110,6 +131,17 @@ export class SvrnClient {
         proposalId: number,
         choice: number
     ) {
+        // Input validation
+        if (!walletPubkey || typeof walletPubkey !== 'string') {
+            throw new Error("Invalid wallet public key");
+        }
+        if (!Number.isInteger(proposalId) || proposalId < 0) {
+            throw new Error("Invalid proposal ID");
+        }
+        if (!Number.isInteger(choice) || (choice !== 0 && choice !== 1)) {
+            throw new Error("Invalid vote choice: must be 0 (NO) or 1 (YES)");
+        }
+
         const proofData = await this.api.getProof(proposalId, walletPubkey);
         const relayerSecret = proofData.proof.secret;
         const zkProof = await this.prover.generateVoteProof(relayerSecret, proofData, proposalId);

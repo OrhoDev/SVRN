@@ -2,7 +2,7 @@ import { Barretenberg, UltraHonkBackend } from '@aztec/bb.js';
 import { Noir } from '@noir-lang/noir_js';
 import { toHex } from './utils.js';
 
-export class SvrnProver {
+export class SolvrnProver {
     private backend: UltraHonkBackend | null = null;
     private noir: Noir | null = null;
 

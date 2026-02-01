@@ -7,7 +7,7 @@ const PROGRAM_ID = new PublicKey("2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg")
 const connection = new Connection("http://127.0.0.1:8899", "confirmed"); // Hardcoded for local testing
 
 async function verifyVote(proposalId: number) {
-    console.log(`\n🔍 Verifying Proposal #${proposalId}...\n`);
+    console.log(`\nVerifying Proposal #${proposalId}...\n`);
     
     // Load IDL
     const idl = JSON.parse(fs.readFileSync('./idl.json', 'utf-8'));
@@ -18,16 +18,16 @@ async function verifyVote(proposalId: number) {
         PROGRAM_ID
     );
     
-    console.log("📍 Proposal PDA:", proposalPda.toBase58());
+    console.log("Proposal PDA:", proposalPda.toBase58());
     
     // Fetch proposal account
     const accountInfo = await connection.getAccountInfo(proposalPda);
     if (!accountInfo) {
-        console.log("❌ Proposal account not found");
+        console.log("Proposal account not found");
         return;
     }
     
-    console.log(`✅ Account exists (${accountInfo.data.length} bytes)`);
+    console.log(`Account exists (${accountInfo.data.length} bytes)`);
     
     // Try to deserialize with IDL
     try {
@@ -35,7 +35,7 @@ async function verifyVote(proposalId: number) {
         const program = new Program(idl, provider) as any;
         const proposal = await program.account.proposal.fetch(proposalPda);
         
-        console.log("\n📊 Proposal Data:");
+        console.log("\nProposal Data:");
         console.log("   Proposal ID:", proposal.proposalId.toString());
         console.log("   Vote Count:", proposal.voteCount.toString());
         console.log("   Authority:", proposal.authority.toBase58());
@@ -47,21 +47,21 @@ async function verifyVote(proposalId: number) {
         const merkleRootBigInt = merkleRootBytes.readBigUInt64LE(0);
         const isZeroRoot = merkleRootBytes.every(b => b === 0);
         
-        console.log("\n🌳 Merkle Root Status:");
+        console.log("\nMerkle Root Status:");
         console.log("   Raw Bytes:", merkleRootHex);
         console.log("   As BigInt:", merkleRootBigInt.toString());
         console.log("   Is Zero:", isZeroRoot);
         
         if (isZeroRoot) {
-            console.log("   ⚠️  DEMO MODE: Merkle verification was SKIPPED");
-            console.log("   ℹ️  Circuit bypassed Merkle check (merkle_root == 0)");
+            console.log("   DEMO MODE: Merkle verification was SKIPPED");
+            console.log("   Circuit bypassed Merkle check (merkle_root == 0)");
         } else {
-            console.log("   ✅ REAL MODE: Merkle verification was REQUIRED");
-            console.log("   ℹ️  Circuit verified Merkle inclusion proof");
+            console.log("   REAL MODE: Merkle verification was REQUIRED");
+            console.log("   Circuit verified Merkle inclusion proof");
         }
         
         // Check for nullifier accounts (votes)
-        console.log("\n🔐 Checking Nullifier Accounts...");
+        console.log("\nChecking Nullifier Accounts...");
         const nullifierAccounts = await connection.getProgramAccounts(PROGRAM_ID, {
             filters: [
                 { dataSize: 8 + 32 + 32 + 4 + 200 + 32 + 16 }, // NullifierAccount size
@@ -71,23 +71,23 @@ async function verifyVote(proposalId: number) {
         
         console.log(`   Found ${nullifierAccounts.length} nullifier account(s)`);
         if (nullifierAccounts.length > 0) {
-            console.log("   ✅ Votes recorded on-chain!");
+            console.log("   Votes recorded on-chain!");
             nullifierAccounts.forEach((acc, i) => {
                 console.log(`   Vote ${i + 1}: ${acc.pubkey.toBase58()}`);
             });
         } else {
-            console.log("   ⚠️  No nullifier accounts found");
+            console.log("   No nullifier accounts found");
         }
         
     } catch (e: any) {
-        console.log("\n⚠️  Could not deserialize (legacy structure?)");
+        console.log("\nCould not deserialize (legacy structure?)");
         console.log("   Error:", e.message);
         
         // Try raw read
         if (accountInfo.data.length >= 24) {
             const voteCountBytes = accountInfo.data.slice(16, 24);
             const voteCount = new BN(voteCountBytes, 'le');
-            console.log(`\n📊 Raw Data Read:`);
+            console.log(`\nRaw Data Read:`);
             console.log("   Vote Count:", voteCount.toNumber());
             
             // Check if it has merkle_root (new structure = 120 bytes, old = 88 bytes)
@@ -97,10 +97,10 @@ async function verifyVote(proposalId: number) {
                 console.log("   Merkle Root (raw):", merkleRootBytes.toString('hex'));
                 console.log("   Is Zero:", isZeroRoot);
                 if (isZeroRoot) {
-                    console.log("   ⚠️  DEMO MODE: Merkle verification was SKIPPED");
+                    console.log("   DEMO MODE: Merkle verification was SKIPPED");
                 }
             } else {
-                console.log("   ⚠️  Legacy proposal (no merkle_root field)");
+                console.log("   Legacy proposal (no merkle_root field)");
             }
         }
     }

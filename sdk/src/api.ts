@@ -20,12 +20,14 @@ export interface ProposalMetadata {
     duration: number; // in hours
 }
 
-export class SvrnApi {
+export class SolvrnApi {
     constructor(private baseUrl: string) {}
 
     // --- UPDATED: Accepts Creator Argument ---
     async initializeSnapshot(proposalId: number, votingMint: string, metadata?: ProposalMetadata, creator?: string) {
-        console.log("SDK SENDING:", { proposalId, votingMint, creator });
+        if (process.env.NODE_ENV !== 'development') {
+            // Remove sensitive logging in production
+        }
         return this.post('initialize-snapshot', { 
             proposalId, 
             votingMint,
@@ -71,6 +73,18 @@ export class SvrnApi {
     }
 
     private async post(endpoint: string, body: any) {
+        // SECURITY: Validate endpoint to prevent demo/admin access
+        const allowedEndpoints = [
+            'initialize-snapshot',
+            'get-proof', 
+            'relay-vote',
+            'prove-tally'
+        ];
+        
+        if (!allowedEndpoints.includes(endpoint)) {
+            throw new Error(`Endpoint '${endpoint}' is not accessible through SDK. Use direct API calls for admin functionality.`);
+        }
+        
         const res = await fetch(`${this.baseUrl}/${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -80,6 +94,22 @@ export class SvrnApi {
     }
 
     private async get(endpoint: string) {
+        // SECURITY: Validate endpoint to prevent demo/admin access
+        const allowedEndpoints = [
+            'next-proposal-id',
+            'proposal',
+            'vote-counts'
+        ];
+        
+        // Check if endpoint matches any allowed pattern
+        const isAllowed = allowedEndpoints.some(allowed => 
+            endpoint === allowed || endpoint.startsWith(`${allowed}/`)
+        );
+        
+        if (!isAllowed) {
+            throw new Error(`Endpoint '${endpoint}' is not accessible through SDK. Use direct API calls for admin functionality.`);
+        }
+        
         const res = await fetch(`${this.baseUrl}/${endpoint}`);
         return await res.json();
     }

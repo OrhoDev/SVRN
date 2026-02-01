@@ -4,9 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "test": "yarn build && playwright test browser.test.ts"
+    "dev": "./node_modules/.bin/vite",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "test:e2e": "yarn build && playwright test browser.test.ts"
   },
   "dependencies": {
     "@arcium-hq/client": "^0.6.2",
@@ -24,15 +29,21 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "shiki": "^3.21.0",
-    "svrn-sdk": "../sdk",
+    "solvrn-sdk": "../sdk",
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
+    "@testing-library/jest-dom": "^6.1.0",
+    "@testing-library/react": "^14.1.0",
+    "@testing-library/user-event": "^14.5.0",
     "@types/node": "^22.19.5",
+    "@vitejs/plugin-react": "^5.1.2",
     "buffer": "^6.0.3",
+    "jsdom": "^23.0.0",
     "typescript": "^5.8.3",
     "vite": "^7.3.0",
-    "vite-plugin-node-polyfills": "0.24.0"
+    "vite-plugin-node-polyfills": "0.24.0",
+    "vitest": "^1.0.0"
   }
 }

@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, TokenAccount, Token, TransferChecked};
 use anchor_spl::associated_token::AssociatedToken;
 
-declare_id!("AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv"); 
+declare_id!("6zAAg4CUGjHeJMjLwWPgjTiAKtRtSqBTTjxcMnLo3vaJ"); 
 
 #[program]
 pub mod solvote_chain {

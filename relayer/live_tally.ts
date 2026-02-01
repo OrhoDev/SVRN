@@ -62,7 +62,7 @@ async function findNextComputationId(connection: Connection, clusterOffset: numb
 }
 
 async function main() {
-    console.log("🗳️  STARTING LIVE ELECTION TALLY...");
+    console.log("STARTING LIVE ELECTION TALLY...");
 
     // 2. SETUP
     // Support Helius RPC via environment variable, fallback to localnet for testing
@@ -87,24 +87,24 @@ async function main() {
     try {
         const arciumEnv = getArciumEnv();
         clusterOffset = arciumEnv.arciumClusterOffset;
-        console.log(`📍 Using Arcium cluster offset from env: ${clusterOffset}`);
+        console.log(`Using Arcium cluster offset from env: ${clusterOffset}`);
     } catch (e) {
         // Fallback to hardcoded cluster offset if env var not set
         // This should match your deployed Arcium cluster offset
         clusterOffset = 456; // Update this to match your actual cluster offset
-        console.log(`⚠️  ARCIUM_CLUSTER_OFFSET not set, using fallback: ${clusterOffset}`);
+        console.log(`ARCIUM_CLUSTER_OFFSET not set, using fallback: ${clusterOffset}`);
         console.log(`   Set ARCIUM_CLUSTER_OFFSET=${clusterOffset} in .env file to suppress this warning`);
     }
 
     // 3. FETCH VOTES
-    console.log("🔍 Scanning Blockchain for Encrypted Votes...");
+    console.log("Scanning Blockchain for Encrypted Votes...");
     const allVotes = await solanaProgram.account.nullifierAccount.all();
     
     if (allVotes.length === 0) {
-        console.log("❌ No votes found on chain. Go vote in the UI first!");
+        console.log("No votes found on chain. Go vote in the UI first!");
         return;
     }
-    console.log(`✅ Found ${allVotes.length} encrypted ballots.`);
+    console.log(`Found ${allVotes.length} encrypted ballots.`);
 
     // 4. PROCESSING LOOP
     let totalYesPower = 0;
@@ -214,27 +214,27 @@ async function main() {
             totalYesPower += powerNum;
 
         } catch (e: any) {
-            console.error(`      > ❌ Error: ${e.message}`);
+            console.error(`      > Error: ${e.message}`);
             if (e.logs) {
                 console.error(`      > Logs:`, e.logs);
             }
             if (e.message?.includes("InvalidComputationOffset")) {
-                console.error(`      > ⚠️  InvalidComputationOffset - Check cluster offset (${clusterOffset}) matches arcium deploy`);
+                console.error(`      > InvalidComputationOffset - Check cluster offset (${clusterOffset}) matches arcium deploy`);
             }
         }
     }
 
     // 5. FINAL REVEAL
     console.log("\n=================================");
-    console.log("🏆 ELECTION RESULTS FINALIZED");
+    console.log("ELECTION RESULTS FINALIZED");
     console.log("=================================");
     console.log(`   TOTAL YES POWER: ${totalYesPower}`);
     console.log("=================================");
 
-    // ⚠️ THE ENGINE TRIGGER
+    // THE ENGINE TRIGGER
     // If YES power exists, we execute the on-chain settlement
     if (totalYesPower > 0) {
-        console.log("\n🚀 WINNING THRESHOLD REACHED. TRIGGERING SETTLEMENT...");
+        console.log("\nWINNING THRESHOLD REACHED. TRIGGERING SETTLEMENT...");
         
         try {
             // Reconstruct Proposal PDA
@@ -251,15 +251,15 @@ async function main() {
                 })
                 .rpc();
 
-            console.log(`✅ ON-CHAIN EXECUTION FINALIZED! TX: ${tx}`);
+            console.log(`ON-CHAIN EXECUTION FINALIZED! TX: ${tx}`);
             
             // Read back the payload to show what was decided
             const propAcc = await solanaProgram.account.proposal.fetch(proposalPda);
             const payload = Buffer.from(propAcc.executionPayload).toString();
-            console.log(`📡 PROCESSED ACTION: ${payload}`);
+            console.log(`PROCESSED ACTION: ${payload}`);
 
         } catch (e: any) {
-            console.error("❌ Execution Trigger Failed:", e.message);
+            console.error("Execution Trigger Failed:", e.message);
         }
     }
 }

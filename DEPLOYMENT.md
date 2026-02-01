@@ -1,9 +1,9 @@
-# 🚀 SVRN Deployment Guide
+# SVRN Deployment Guide
 
-## 📋 Overview
+## Overview
 Deploy SVRN to production with Vercel (frontend) and Render (relayer).
 
-## 🔧 Environment Setup
+## Environment Setup
 
 ### Frontend (Vercel)
 1. **Install Vercel CLI**: `npm i -g vercel`
@@ -29,7 +29,7 @@ Deploy SVRN to production with Vercel (frontend) and Render (relayer).
    CORS_ORIGIN=https://your-frontend.vercel.app
    ```
 
-## 🚀 Deployment Steps
+## Deployment Steps
 
 ### 1. Deploy Relayer (Render)
 ```bash
@@ -48,21 +48,21 @@ vercel --prod
 # Deploy!
 ```
 
-## 🔐 Security Checklist
+## Security Checklist
 
-### ✅ Done
+### Done
 - Environment variables configured
 - Hardcoded secrets removed
 - CORS properly configured
 - Rate limiting enabled
 
-### ⚠️ Important
+### Important
 - Keep relayer keypair.json secure
 - Monitor API usage
 - Set up error monitoring
 - Use HTTPS everywhere
 
-## 📊 Monitoring
+## Monitoring
 
 ### Render (Relayer)
 - Built-in metrics dashboard
@@ -74,19 +74,19 @@ vercel --prod
 - Performance metrics
 - Web Vitals
 
-## 🔄 CI/CD Pipeline
+## CI/CD Pipeline
 
 Both platforms support automatic deployments from GitHub:
 1. Push to `main` branch → Auto-deploy to production
 2. Push to `dev` branch → Auto-deploy to preview
 
-## 🌐 URLs After Deployment
+## URLs After Deployment
 
 - **Frontend**: `https://svrn-app.vercel.app`
 - **Relayer**: `https://svrn-relayer.onrender.com`
 - **Health Check**: `https://svrn-relayer.onrender.com/health`
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 1. **CORS errors**: Update CORS_ORIGIN in relayer
@@ -103,7 +103,7 @@ curl https://svrn-relayer.onrender.com/health
 npm run build && npm run preview
 ```
 
-## 📈 Scaling
+## Scaling
 
 ### Free Tier Limits
 - **Render**: 750 hours/month, 512MB RAM
@@ -114,7 +114,7 @@ npm run build && npm run preview
 2. **Vercel Pro**: $20/month for more bandwidth
 3. **Custom domains**: Configure in both platforms
 
-## 🎯 Production Checklist
+## Production Checklist
 
 - [ ] Environment variables set
 - [ ] HTTPS configured

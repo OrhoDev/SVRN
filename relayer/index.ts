@@ -23,7 +23,7 @@ let tallyCircuit: any;
 try {
     tallyCircuit = JSON.parse(fs.readFileSync(tallyCircuitPath, 'utf-8'));
 } catch (e) {
-    console.warn("⚠️ tally.json not found. Run 'nargo compile' and copy the json file.");
+    console.warn("tally.json not found. Run 'nargo compile' and copy the json file.");
 }
 
 const PORT = 3000;
@@ -41,21 +41,21 @@ const program = new anchor.Program(idl, provider) as any;
 
 const SNAPSHOT_DB: Record<string, any> = {};
 
-console.log("🚀 SVRN Sovereign Relayer Online");
+console.log("SVRN Sovereign Relayer Online");
 
 // --- ZK KERNEL ---
 let bb: any;
 async function initZK() {
     console.log("   Initializing Barretenberg WASM (Async Mode)...");
     bb = await Barretenberg.new();
-    console.log("   ✅ ZK Backend Ready");
+    console.log("   ZK Backend Ready");
 }
 
 // Initialize ZK before starting server
 async function startServer() {
     await initZK();
     
-    app.listen(PORT, () => console.log(`📡 Relayer listening on http://localhost:${PORT}`));
+    app.listen(PORT, () => console.log(`Relayer listening on http://localhost:${PORT}`));
 }
 
 startServer();
@@ -195,25 +195,35 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
         const data: any = await response.json();
         const accounts = data.result?.token_accounts || [];
         let voters = accounts.map((acc: any) => ({ owner: acc.owner, balance: Number(acc.amount) }))
-            .filter((v: any) => v.balance > 0).slice(0, 8); 
+            .filter((v: any) => v.balance > 0).slice(0, 256);
 
-        // PRODUCTION MODE: Only use actual token holders
+        // PRODUCTION MODE: Only add creator if they have tokens
         if (creator) {
             const creatorInVoters = voters.find((v: any) => v.owner === creator);
             if (!creatorInVoters) {
-                console.log(`❌ PRODUCTION MODE: Creator ${creator.slice(0,6)}... has no voting tokens`);
-                // Don't add them - they must have tokens to vote
+                console.log(`PRODUCTION MODE: Creator ${creator.slice(0,6)}... has no tokens. Not adding to voter list.`);
+                // In production mode, we DON'T force-add creators without tokens
+                // Uncomment the following lines for demo/testing mode:
+                /*
+                voters.unshift({
+                    owner: creator,
+                    balance: 1000000 // Default to 1 SOL for demo
+                });
+                console.log(`DEMO MODE: Force-added creator ${creator.slice(0,6)}... at beginning`);
+                */
             } else {
-                console.log(`✅ PRODUCTION MODE: Creator ${creator.slice(0,6)}... has voting tokens`);
+                console.log(`PRODUCTION MODE: Creator ${creator.slice(0,6)}... already in voter list with ${creatorInVoters.balance} tokens`);
             }
         }
 
+        // NOW build voterMap - creator is already in voters array
         if (voters.length === 0) throw new Error("No token holders found.");
 
         const leavesFr: Fr[] = []; 
         const voterMap: Record<string, any> = {};
 
         console.log(`\n--- BUILDING QUADRATIC VOTING TREE (Prop #${propKey}) ---`);
+        console.log(`Total voters before creator check: ${voters.length}`);
 
         for (let i = 0; i < voters.length; i++) {
             const v = voters[i];
@@ -222,7 +232,7 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
             // Feature 1: Quadratic Weighting (Square Root)
             const weight = Math.floor(Math.sqrt(v.balance));
             
-            console.log(`   User: ${v.owner.slice(0,6)}... | Bal: ${v.balance} | Weight: ${weight}`);
+            console.log(`   [${i}] User: ${v.owner.slice(0,6)}... | Bal: ${v.balance} | Weight: ${weight}`);
 
             const leaf = await noirHash(secretVal, weight);
             leavesFr.push(leaf);
@@ -236,8 +246,11 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
             };
         }
 
+        console.log(`Total voters processed: ${Object.keys(voterMap).length}`);
+        console.log(`Creator ${creator?.slice(0,6)}... in voterMap: ${creator ? (voterMap[creator] ? 'YES' : 'NO') : 'N/A'}`);
+
         const zeroLeaf = await noirHash(0, 0);
-        while (leavesFr.length < 8) leavesFr.push(zeroLeaf);
+        while (leavesFr.length < 256) leavesFr.push(zeroLeaf);
 
         const levels: string[][] = [leavesFr.map(f => f.toString())];
         let currentLevel: Fr[] = leavesFr;
@@ -245,7 +258,10 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
         while (currentLevel.length > 1) {
             const nextLevelFr: Fr[] = [];
             for (let i = 0; i < currentLevel.length; i += 2) {
-                const parent = await noirHash(currentLevel[i], currentLevel[i+1]);
+                // Handle odd number of nodes by duplicating the last one
+                const left = currentLevel[i];
+                const right = (i + 1 < currentLevel.length) ? currentLevel[i + 1] : currentLevel[i];
+                const parent = await noirHash(left, right);
                 nextLevelFr.push(parent);
             }
             currentLevel = nextLevelFr;
@@ -265,7 +281,109 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
     }
 });
 
-// --- DEMO ENDPOINT: Add creator to existing voting tree ---
+// --- PRODUCTION ENDPOINT: Add creator to existing voting tree ---
+app.post('/add-creator', async (req: Request, res: Response) => {
+    try {
+        const { proposalId, creator } = req.body;
+        const propKey = proposalId.toString();
+        
+        if (!SNAPSHOT_DB[propKey]) {
+            return res.status(404).json({ success: false, error: "Proposal not found" });
+        }
+        
+        const snapshot = SNAPSHOT_DB[propKey];
+        const creatorInVoters = snapshot.voterMap[creator];
+        
+        if (creatorInVoters) {
+            return res.json({ success: true, message: "Creator already in voting tree" });
+        }
+        
+        // PRODUCTION MODE: Check actual token balance first
+        console.log(`🔧 PRODUCTION: Checking token balance for creator ${creator.slice(0,6)}...`);
+        
+        const response = await fetch(RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 'svrn', method: 'getTokenAccounts',
+                params: { mint: snapshot.metadata?.votingMint || "So11111111111111111111111111111111111111112", 
+                         limit: 1, options: { showZeroBalance: false },
+                         account: creator }
+            })
+        });
+        
+        const data: any = await response.json();
+        const accounts = data.result?.token_accounts || [];
+        
+        if (accounts.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Creator has no token balance. Cannot add to voting tree." 
+            });
+        }
+        
+        const balance = Number(accounts[0].amount);
+        const weight = Math.floor(Math.sqrt(balance));
+        
+        console.log(`✅ PRODUCTION: Creator found with balance ${balance}, weight ${weight}`);
+        
+        const secretVal = deriveSecret(creator);
+        const leaf = await noirHash(secretVal, weight);
+        
+        // Add to voterMap with REAL balance
+        const creatorIndex = Object.keys(snapshot.voterMap).length;
+        snapshot.voterMap[creator] = {
+            index: creatorIndex,
+            balance: balance,
+            weight: weight,
+            secret: "0x" + secretVal.toString(16).padStart(64, '0'),
+            leaf: leaf.toString()
+        };
+        
+        // REBUILD THE MERKLE TREE with the new leaf
+        const voters = Object.values(snapshot.voterMap);
+        const leavesFr: Fr[] = voters.map((v: any) => {
+            const clean = v.leaf.toString().replace('0x', '');
+            return Fr.fromString(clean);
+        });
+        
+        // Pad to power of 2 if needed
+        const zeroLeaf = await noirHash(0, 0);
+        let targetSize = 1;
+        while (targetSize < leavesFr.length) targetSize *= 2;
+        while (leavesFr.length < targetSize) leavesFr.push(zeroLeaf);
+        
+        // Rebuild levels
+        const levels: string[][] = [leavesFr.map(f => f.toString())];
+        let currentLevel: Fr[] = leavesFr;
+        
+        while (currentLevel.length > 1) {
+            const nextLevelFr: Fr[] = [];
+            for (let i = 0; i < currentLevel.length; i += 2) {
+                const left = currentLevel[i];
+                const right = (i + 1 < currentLevel.length) ? currentLevel[i + 1] : currentLevel[i];
+                const parent = await noirHash(left, right);
+                nextLevelFr.push(parent);
+            }
+            currentLevel = nextLevelFr;
+            levels.push(currentLevel.map(f => f.toString()));
+        }
+        
+        // Update the snapshot with new tree
+        const newRoot = levels[levels.length - 1][0];
+        snapshot.root = newRoot;
+        snapshot.levels = levels;
+        
+        console.log(`🔧 PRODUCTION: Rebuilt tree. New root: ${newRoot.slice(0, 16)}...`);
+        res.json({ success: true, message: "Creator added with real token balance", root: newRoot, balance, weight });
+        
+    } catch (e: any) {
+        console.error("ADD_CREATOR_ERROR:", e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// --- DEMO ENDPOINT: Add creator with 1 token (for testing only) ---
 app.post('/demo-add-creator', async (req: Request, res: Response) => {
     try {
         const { proposalId, creator } = req.body;
@@ -282,7 +400,7 @@ app.post('/demo-add-creator', async (req: Request, res: Response) => {
             return res.json({ success: true, message: "Creator already in voting tree" });
         }
         
-        console.log(`🔧 DEMO: Rebuilding Merkle tree to include creator ${creator.slice(0,6)}...`);
+        console.log(`🔧 DEMO: Adding creator ${creator.slice(0,6)}... with 1 token for testing`);
         
         // Add creator with minimum balance (1 token) for voting rights
         const secretVal = deriveSecret(creator);
@@ -308,7 +426,9 @@ app.post('/demo-add-creator', async (req: Request, res: Response) => {
         
         // Pad to power of 2 if needed
         const zeroLeaf = await noirHash(0, 0);
-        while (leavesFr.length < 8) leavesFr.push(zeroLeaf);
+        let targetSize = 1;
+        while (targetSize < leavesFr.length) targetSize *= 2;
+        while (leavesFr.length < targetSize) leavesFr.push(zeroLeaf);
         
         // Rebuild levels
         const levels: string[][] = [leavesFr.map(f => f.toString())];
@@ -317,7 +437,9 @@ app.post('/demo-add-creator', async (req: Request, res: Response) => {
         while (currentLevel.length > 1) {
             const nextLevelFr: Fr[] = [];
             for (let i = 0; i < currentLevel.length; i += 2) {
-                const parent = await noirHash(currentLevel[i], currentLevel[i+1]);
+                const left = currentLevel[i];
+                const right = (i + 1 < currentLevel.length) ? currentLevel[i + 1] : currentLevel[i];
+                const parent = await noirHash(left, right);
                 nextLevelFr.push(parent);
             }
             currentLevel = nextLevelFr;
@@ -330,7 +452,7 @@ app.post('/demo-add-creator', async (req: Request, res: Response) => {
         snapshot.levels = levels;
         
         console.log(`🔧 DEMO: Rebuilt tree. New root: ${newRoot.slice(0, 16)}...`);
-        res.json({ success: true, message: "Creator added and tree rebuilt", root: newRoot });
+        res.json({ success: true, message: "Creator added with 1 token (demo mode)", root: newRoot });
         
     } catch (e: any) {
         console.error("DEMO_ADD_CREATOR_ERROR:", e.message);
@@ -352,13 +474,13 @@ app.post('/get-proof', (req: Request, res: Response) => {
 
         const path: string[] = [];
         let currIdx = voter.index;
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 8; i++) {
             const siblingIdx = (currIdx % 2 === 0) ? currIdx + 1 : currIdx - 1;
             path.push(snap.levels[i][siblingIdx]);
             currIdx = Math.floor(currIdx / 2);
         }
         const proof = { ...voter, path, root: snap.root };
-        console.log(`🔍 Proof requested - proposal=${proposalId} user=${userPubkey} index=${voter.index} root=${snap.root.slice(0,16)}...`);
+        console.log(`Proof requested - proposal=${proposalId} user=${userPubkey} index=${voter.index} root=${snap.root.slice(0,16)}...`);
         console.log(`       Proof.path: [${path.map(p=>p.slice(0,8)).join(', ')}]`);
         res.json({ success: true, proof });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -370,11 +492,11 @@ app.post('/get-proof', (req: Request, res: Response) => {
 
 app.post('/relay-vote', async (req: Request, res: Response) => {
     try {
-        console.log("🔍 RELAY-VOTE DEBUG: Received body:", JSON.stringify(req.body, null, 2));
+        console.log("RELAY-VOTE DEBUG: Received body:", JSON.stringify(req.body, null, 2));
         
         const { nullifier, ciphertext, pubkey, nonce, proposalId } = req.body;
         
-        console.log("🔍 RELAY-VOTE DEBUG: Types:", {
+        console.log("RELAY-VOTE DEBUG: Types:", {
             nullifier: typeof nullifier,
             ciphertext: typeof ciphertext,
             pubkey: typeof pubkey,
@@ -390,7 +512,7 @@ app.post('/relay-vote', async (req: Request, res: Response) => {
         // Helpful debug prints for explorer verification
         try {
             const nullifierBuf = Buffer.from(nullifier);
-            console.log(`🔐 Relay Vote - proposal=${proposalId}`);
+            console.log(`Relay Vote - proposal=${proposalId}`);
             console.log(`   proposalPda: ${proposalPda.toBase58()}`);
             console.log(`   nullifierPda: ${nullifierPda.toBase58()}`);
             console.log(`   nullifier (hex): ${nullifierBuf.toString('hex').slice(0,64)}...`);
@@ -414,7 +536,7 @@ app.post('/relay-vote', async (req: Request, res: Response) => {
 
         // Print the returned signature + explorer link to make verification trivial
         try {
-            console.log(`✅ Vote relayed. tx: ${tx}`);
+            console.log(`Vote relayed. tx: ${tx}`);
             console.log(`   Explorer (devnet): https://explorer.solana.com/tx/${tx}?cluster=devnet`);
             console.log(`   Check nullifier account: https://explorer.solana.com/address/${nullifierPda.toBase58()}?cluster=devnet`);
         } catch (logErr) { console.warn('Could not print tx explorer link', logErr); }
@@ -464,11 +586,11 @@ async function decryptVotes(votes: any[]): Promise<{yesVotes: number, noVotes: n
             }
             
         } catch (e: any) {
-            console.error(`      > ❌ Failed to decrypt ballot #${i + 1}: ${e.message}`);
+            console.error(`      > Failed to decrypt ballot #${i + 1}: ${e.message}`);
         }
     }
     
-    console.log(`\n   📊 Decryption Complete: ${yesVotes} YES, ${noVotes} NO`);
+    console.log(`\n   Decryption Complete: ${yesVotes} YES, ${noVotes} NO`);
     return {yesVotes, noVotes};
 }
 
@@ -517,7 +639,10 @@ app.get('/vote-counts/:proposalId', async (req: Request, res: Response) => {
             totalVotes: Math.max(proposalVotes.length, yesVotes + noVotes),
             quorumMet: Math.max(proposalVotes.length, yesVotes + noVotes) >= 10, // QUORUM_REQ
             isDemoMode: proposalVotes.length === 0,
-            realVoteCount: proposalVotes.length
+            realVoteCount: proposalVotes.length,
+            // IMPORTANT: yes/no breakdown is simulated until real Arcium MPC decryption is implemented
+            breakdownSimulated: true,
+            warning: proposalVotes.length > 0 ? "Vote decryption is simulated. Real decryption coming soon." : "No votes found. Using demo counts."
         });
         
     } catch (e: any) {
@@ -531,7 +656,7 @@ app.get('/vote-counts/:proposalId', async (req: Request, res: Response) => {
 
 app.post('/prove-tally', async (req: Request, res: Response) => {
     try {
-        console.log("⚖️  Generating ZK Tally Proof...");
+        console.log("Generating ZK Tally Proof...");
         
         if (!tallyCircuit) throw new Error("Tally Circuit JSON not found.");
         
@@ -560,7 +685,7 @@ app.post('/prove-tally', async (req: Request, res: Response) => {
         const proof = await tallyBackend.generateProof(witness);
         const hexProof = Buffer.from(proof.proof).toString('hex');
         
-        console.log(`   ✅ Tally Proof Generated! Length: ${hexProof.length} chars`);
+        console.log(`   Tally Proof Generated! Length: ${hexProof.length} chars`);
         
         res.json({ 
             success: true, 
@@ -578,4 +703,4 @@ app.post('/prove-tally', async (req: Request, res: Response) => {
     }
 });
 
-app.listen(PORT, () => console.log(`📡 Relayer listening on http://localhost:${PORT}`));
+// Server started in startServer() function

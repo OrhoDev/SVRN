@@ -25,7 +25,7 @@ cleanup() {
 # Set up signal handlers
 trap cleanup SIGINT SIGTERM
 
-echo -e "${GREEN}🚀 Starting SVRN Services (Development Mode)...${NC}\n"
+echo -e "${GREEN}Starting SVRN Services (Development Mode)...${NC}\n"
 
 # Function to run relayer with colored output
 run_relayer() {
@@ -57,12 +57,12 @@ sleep 2
 
 # Check if relayer is still running
 if ! kill -0 $RELAYER_PID 2>/dev/null; then
-    echo -e "${RED}❌ Relayer failed to start${NC}"
+    echo -e "${RED}Relayer failed to start${NC}"
     cleanup
     exit 1
 fi
 
-echo -e "${GREEN}✅ Relayer started (PID: $RELAYER_PID)${NC}\n"
+echo -e "${GREEN}Relayer started (PID: $RELAYER_PID)${NC}\n"
 
 # Start frontend in background
 run_frontend &
@@ -73,15 +73,15 @@ sleep 3
 
 # Check if frontend is still running
 if ! kill -0 $FRONTEND_PID 2>/dev/null; then
-    echo -e "${RED}❌ Frontend failed to start${NC}"
+    echo -e "${RED}Frontend failed to start${NC}"
     cleanup
     exit 1
 fi
 
-echo -e "${GREEN}✅ Frontend started (PID: $FRONTEND_PID)${NC}\n"
+echo -e "${GREEN}Frontend started (PID: $FRONTEND_PID)${NC}\n"
 
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}✅ All services running!${NC}"
+echo -e "${GREEN}All services running!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}Relayer:${NC}   http://localhost:3000"
 echo -e "${BLUE}Frontend:${NC}  http://localhost:4173"

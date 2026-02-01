@@ -3,6 +3,9 @@ import { ConnectionProvider, WalletProvider, useAnchorWallet, useWallet, useConn
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+
+// --- DEBUGGING ---
+// console.log('Wallet adapters loaded:', { PhantomWalletAdapter, WalletMultiButton });
 import { AnchorProvider, Program } from '@coral-xyz/anchor';
 import BN from 'bn.js';
 import { PublicKey, clusterApiUrl, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
@@ -10,7 +13,7 @@ import { Buffer } from 'buffer';
 import idl from './idl.json';
 
 // --- SDK IMPORT ---
-import { SvrnClient } from 'svrn-sdk';
+import { SolvrnClient } from 'solvrn-sdk';
 import circuit from '../circuit/target/circuit.json';
 
 // --- ASSETS & STYLES ---
@@ -175,8 +178,7 @@ const StyledWalletButton = () => {
 
 // CLEANED UP TOKEN LIST
 const SUPPORTED_TOKENS = [
-    { name: "$SVRN (Legacy)", address: "DD641F4zVEsNkZGu6M22YLY2fvhwGaN6hrcGgMfw6i6k" },
-    { name: "$SOL (Wrapped)", address: "So11111111111111111111111111111111111111112" }
+    { name: "SOL (Wrapped)", address: "So11111111111111111111111111111111111111112" }
 ];
 
 const Dashboard = () => {
@@ -192,13 +194,20 @@ const Dashboard = () => {
     const [darkMode, setDarkMode] = useState(false);
     const [scrollY, setScrollY] = useState(0); // For scroll effect
    
-    const [votingMintStr, setVotingMintStr] = useState("DD641F4zVEsNkZGu6M22YLY2fvhwGaN6hrcGgMfw6i6k");
+    const [votingMintStr, setVotingMintStr] = useState("So11111111111111111111111111111111111111112");
     const [propTitle, setPropTitle] = useState("Grant for Privacy Research");
     const [propDesc, setPropDesc] = useState("Allocate 5000 USDC to the SVRN Labs team for ZK-circuit optimizations.");
     const [duration, setDuration] = useState(24);
     
     // SDK State
-    const svrn = useMemo(() => new SvrnClient(import.meta.env.VITE_RELAYER_URL || "http://localhost:3000"), []);
+    const svrn = useMemo(() => {
+        console.log('Creating SolvrnClient with PROGRAM_ID:', import.meta.env.VITE_PROGRAM_ID);
+        return new SolvrnClient(
+            import.meta.env.VITE_RELAYER_URL || "http://localhost:3000",
+            import.meta.env.VITE_ARCIUM_PROGRAM_ID,
+            import.meta.env.VITE_PROGRAM_ID
+        );
+    }, []);
     const [zkReady, setZkReady] = useState(false);
 
     const [liveVoteCount, setLiveVoteCount] = useState(0);
@@ -226,24 +235,24 @@ const Dashboard = () => {
 
     // Initial SDK Init
     useEffect(() => {
-        console.log("🔧 Initializing SVRN SDK...");
+        console.log("Initializing SVRN SDK...");
         
         // Add timeout to detect hanging
         const timeout = setTimeout(() => {
-            console.error("❌ SVRN SDK initialization timed out after 10 seconds");
+            console.error("SVRN SDK initialization timed out after 10 seconds");
             setHistory([{
                 title: "INITIALIZATION TIMEOUT",
                 api: "SVRN SDK",
                 code: `// SDK initialization timed out
 await svrn.init(circuit);
 // This usually indicates a WASM loading issue`,
-                result: "❌ SDK initialization timed out (WASM loading issue)"
+                result: "SDK initialization timed out (WASM loading issue)"
             }]);
         }, 10000);
         
         svrn.init(circuit).then(() => {
             clearTimeout(timeout);
-            console.log("✅ SVRN SDK initialized successfully");
+            console.log("SVRN SDK initialized successfully");
             setZkReady(true);
             setHistory([{
                 title: "INITIALIZATION",
@@ -303,9 +312,9 @@ await svrn.init(circuit);
 
         try {
             // Get next proposal ID from relayer
-            console.log("🔍 Getting next proposal ID from relayer...");
+            console.log("Getting next proposal ID from relayer...");
             const nextIdResponse = await svrn.api.getNextProposalId();
-            console.log("📝 Next proposal ID response:", nextIdResponse);
+            console.log("Next proposal ID response:", nextIdResponse);
             let nextProposalId = nextIdResponse.nextId; 
             
             while (true) {
@@ -323,16 +332,23 @@ await svrn.init(circuit);
             addEntry(
                 "The SDK creates your proposal and builds a secure voter snapshot",
                 "createProposal",
-                `const proposalId = ${nextProposalId};
-const mint = new PublicKey("${votingMintStr.slice(0,8)}...");
-
-await svrn.createProposal(
+                `// SDK handles proposal creation and snapshot generation
+const { proposalId, txid } = await svrn.createProposal(
     provider,
     publicKey,
-    mint,
-    { title: "${propTitle}", duration: ${duration} },
-    0.05
-);`,
+    "${votingMintStr.slice(0,8)}...",  // Voting mint
+    { 
+        title: "${propTitle}", 
+        desc: "${propDesc.slice(0, 30)}...",
+        duration: ${duration} 
+    },
+    0.05  // Gas buffer (SOL)
+);
+
+// SDK internally:
+// 1. Gets next proposal ID from relayer
+// 2. Initializes snapshot (builds Merkle tree)
+// 3. Creates on-chain proposal account`, 
                 "Initializing...",
                 null
             );
@@ -347,13 +363,13 @@ await svrn.createProposal(
             );
 
             // DEMO MODE: Add creator to voting tree if they don't have tokens
-            console.log("🔍 DEMO: Checking if creator needs to be added to voting tree...");
+            console.log("DEMO: Checking if creator needs to be added to voting tree...");
             try {
                 const proposal = await svrn.api.getProposal(nextProposalId);
                 if (proposal.success && proposal.proposal.voterMap) {
                     const creatorInVoters = proposal.proposal.voterMap[publicKey.toBase58()];
                     if (!creatorInVoters) {
-                        console.log("🔧 DEMO: Creator not in voting tree - adding them manually...");
+                        console.log("DEMO: Creator not in voting tree - adding them manually...");
                         
                         // Call demo endpoint to add creator to voting tree
                         const response = await fetch(`${import.meta.env.VITE_RELAYER_URL || "http://localhost:3000"}/demo-add-creator`, {
@@ -367,34 +383,34 @@ await svrn.createProposal(
                         
                         const result = await response.json();
                         if (result.success) {
-                            console.log("✅ DEMO: Successfully added creator to voting tree");
+                    console.log("DEMO: Successfully added creator to voting tree");
                         } else {
-                            console.log("❌ DEMO: Failed to add creator to voting tree:", result.error);
+                            console.log("DEMO: Failed to add creator to voting tree:", result.error);
                         }
                     } else {
-                        console.log("✅ DEMO: Creator already in voting tree");
+                        console.log("DEMO: Creator already in voting tree");
                     }
                 }
             } catch (e) {
-                console.log("🔍 DEMO: Could not check voter map:", e);
+                console.log("DEMO: Could not check voter map:", e);
             }
 
             setProposalId(nextProposalId);
             
             // Verify proposal exists in relayer before enabling voting
             try {
-                console.log("🔍 Verifying proposal exists in relayer:", nextProposalId);
+                console.log("Verifying proposal exists in relayer:", nextProposalId);
                 const proposal = await svrn.api.getProposal(nextProposalId);
-                console.log("📝 Proposal response:", proposal);
+                console.log("Proposal response:", proposal);
                 if (proposal.success) {
-                    console.log("✅ Proposal found in relayer, enabling voting");
+                    console.log("Proposal found in relayer, enabling voting");
                     setIsSnapshotReady(true);
                 } else {
-                    console.log("❌ Proposal not found in relayer");
+                    console.log("Proposal not found in relayer");
                     setIsSnapshotReady(false);
                 }
             } catch (e) {
-                console.error('❌ Failed to fetch proposal from relayer:', e);
+                console.error('Failed to fetch proposal from relayer:', e);
                 setIsSnapshotReady(false);
             }
 
@@ -420,23 +436,19 @@ await svrn.createProposal(
         setIsLoading(true);
         try {
             addEntry("Your vote is encrypted using zero-knowledge proofs before being submitted", "castVote", 
-`const proof = await svrn.prover.generateVoteProof(
-    secret, 
-    voterData, 
-    proposalId
+`// Full voting flow - SDK handles everything
+const result = await svrn.castVote(
+    provider,
+    publicKey.toBase58(),
+    proposalId,
+    choice  // 0 = NO, 1 = YES
 );
 
-const encrypted = await svrn.encryption.encryptVote(
-    provider, 
-    choice, 
-    votingWeight
-);
-
-await svrn.api.submitVote(
-    proposalId, 
-    nullifier, 
-    encrypted
-);`, "Generating Zero-Knowledge Proof...");
+// SDK internally:
+// 1. Gets Merkle proof from relayer
+// 2. Generates ZK proof (Noir + Barretenberg)
+// 3. Encrypts vote (Arcium MPC)
+// 4. Submits to Solana via relayer`, "Generating Zero-Knowledge Proof...");
 
             const provider = new AnchorProvider(connection, anchorWallet, {});
             const result = await svrn.castVote(provider, publicKey.toBase58(), proposalId, choice);
@@ -464,7 +476,7 @@ await svrn.api.submitVote(
 
 if (nullifierExists(userNullifier)) {
     throw new Error("Vote already cast");
-}`, "✅ Security Success: Double-voting prevented while preserving privacy");
+}`, "Security Success: Double-voting prevented while preserving privacy");
             } else {
                 console.error(e);
                 alert("Vote Failed: " + e.message); 
@@ -478,12 +490,16 @@ if (nullifierExists(userNullifier)) {
         if (isLoading || !proposalId) return;
 
         addEntry("The encrypted votes are tallied and results are proven on-chain", "proveTally", 
-`const tallyProof = await svrn.api.proveTally(
+`// Get vote counts (note: breakdown is simulated until decryption implemented)
+const voteCounts = await svrn.api.getVoteCounts(proposalId);
+
+// Generate ZK tally proof
+const tallyProof = await svrn.api.proveTally(
     proposalId,
-    yesVotes,
-    noVotes, 
-    threshold,
-    quorum
+    voteCounts.yesVotes,
+    voteCounts.noVotes, 
+    ${THRESHOLD_REQ},  // Threshold %
+    ${QUORUM_REQ}     // Quorum requirement
 );
 
 // ZK proof ensures correctness while
@@ -579,7 +595,7 @@ console.log('Tally verified:', tallyProof.success);`, "Proving election results.
                 <div className="relative z-10">
               <div 
     onClick={() => {
-        navigator.clipboard.writeText("npm install svrn-sdk");
+        navigator.clipboard.writeText("npm install solvrn-sdk");
         setNpmCopied(true);
         setTimeout(() => setNpmCopied(false), 2000);
     }}
@@ -592,7 +608,7 @@ console.log('Tally verified:', tallyProof.success);`, "Proving election results.
         </span>
     ) : (
         <span className="flex items-center gap-2">
-            <Terminal size={12}/> npm install svrn-sdk
+            <Terminal size={12}/> npm install solvrn-sdk
         </span>
     )}
 </div>
@@ -860,18 +876,18 @@ console.log('Tally verified:', tallyProof.success);`, "Proving election results.
         
         <div className="bg-[#252525] border-4 border-[var(--border-main)] p-8 text-left shadow-[12px_12px_0px_var(--shadow-color)] text-sm md:text-base font-mono leading-relaxed overflow-x-auto rounded-sm text-[#abb2bf]">
             <div className="mb-4">
-                <span className="text-[#5c6370] italic">// 1. Initialize SVRN Client</span><br/>
-                <span className="text-[#c678dd]">const</span> svrn <span className="text-[#56b6c2]">=</span> <span className="text-[#c678dd]">new</span> <span className="text-[#e5c07b]">SvrnClient</span><span className="text-[#abb2bf]">();</span>
+                <span className="text-[#5c6370] italic">// 1. Initialize Solvrn Client</span><br/>
+                <span className="text-[#c678dd]">const</span> solvrn <span className="text-[#56b6c2]">=</span> <span className="text-[#c678dd]">new</span> <span className="text-[#e5c07b]">SolvrnClient</span><span className="text-[#abb2bf]">();</span>
             </div>
 
             <div className="mb-4">
                 <span className="text-[#5c6370] italic">// 2. Create Proposal (Auto-ID & Snapshot)</span><br/>
-                <span className="text-[#c678dd]">await</span> svrn<span className="text-[#abb2bf]">.</span><span className="text-[#61afef]">createProposal</span><span className="text-[#abb2bf]">(</span>provider<span className="text-[#abb2bf]">,</span> authority<span className="text-[#abb2bf]">,</span> mint<span className="text-[#abb2bf]">,</span> meta<span className="text-[#abb2bf]">);</span>
+                <span className="text-[#c678dd]">await</span> solvrn<span className="text-[#abb2bf]">.</span><span className="text-[#61afef]">createProposal</span><span className="text-[#abb2bf]">(</span>provider<span className="text-[#abb2bf]">,</span> authority<span className="text-[#abb2bf]">,</span> mint<span className="text-[#abb2bf]">,</span> meta<span className="text-[#abb2bf]">);</span>
             </div>
 
             <div>
                 <span className="text-[#5c6370] italic">// 3. Shielded Privacy Vote (ZK + MPC)</span><br/>
-                <span className="text-[#c678dd]">await</span> svrn<span className="text-[#abb2bf]">.</span><span className="text-[#61afef]">castVote</span><span className="text-[#abb2bf]">(</span>provider<span className="text-[#abb2bf]">,</span> user<span className="text-[#abb2bf]">,</span> id<span className="text-[#abb2bf]">,</span> <span className="text-[#d19a66]">1</span><span className="text-[#abb2bf]">);</span>
+                <span className="text-[#c678dd]">await</span> solvrn<span className="text-[#abb2bf]">.</span><span className="text-[#61afef]">castVote</span><span className="text-[#abb2bf]">(</span>provider<span className="text-[#abb2bf]">,</span> user<span className="text-[#abb2bf]">,</span> id<span className="text-[#abb2bf]">,</span> <span className="text-[#d19a66]">1</span><span className="text-[#abb2bf]">);</span>
             </div>
         </div>
     </div>
@@ -890,16 +906,16 @@ console.log('Tally verified:', tallyProof.success);`, "Proving election results.
                             <div className="group">
                                 <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">1. Install Package</p>
                                 <div className="bg-[var(--bg-card)] border-2 border-[var(--border-main)] p-4 flex justify-between items-center shadow-[4px_4px_0px_var(--shadow-color)] group-hover:shadow-[4px_4px_0px_var(--text-main)] transition-shadow">
-                                    <code className="text-xs font-mono text-[var(--text-main)]">npm i svrn-sdk</code>
-                                    <CopyButton text="npm i svrn-sdk" />
+                                    <code className="text-xs font-mono text-[var(--text-main)]">npm i solvrn-sdk</code>
+                                    <CopyButton text="npm i solvrn-sdk" />
                                 </div>
                             </div>
                             <div className="group">
                                 <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">2. Instantiate Client</p>
                                 <div className="bg-[var(--bg-card)] border-2 border-[var(--border-main)] p-4 relative shadow-[4px_4px_0px_var(--shadow-color)] group-hover:shadow-[4px_4px_0px_var(--text-main)] transition-shadow">
                                     <pre className="text-xs font-mono text-[var(--text-main)] overflow-x-auto">
-                                        <span className="font-bold text-[#a626a4]">import</span> &#123; SvrnClient &#125; <span className="font-bold text-[#a626a4]">from</span> 'svrn-sdk';<br/>
-                                        <span className="font-bold text-[#a626a4]">const</span> client = <span className="font-bold text-[#a626a4]">new</span> <span className="text-[#c18401]">SvrnClient</span>(RPC_URL);
+                                        <span className="font-bold text-[#a626a4]">import</span> &#123; SolvrnClient &#125; <span className="font-bold text-[#a626a4]">from</span> 'solvrn-sdk';<br/>
+                                        <span className="font-bold text-[#a626a4]">const</span> client = <span className="font-bold text-[#a626a4]">new</span> <span className="text-[#c18401]">SolvrnClient</span>(RPC_URL);
                                     </pre>
                                 </div>
                             </div>
@@ -968,8 +984,39 @@ console.log('Tally verified:', tallyProof.success);`, "Proving election results.
 export default function App() {
     const network = WalletAdapterNetwork.Devnet;
     const endpoint = useMemo(() => import.meta.env.VITE_HELIUS_RPC_URL || clusterApiUrl(network), [network]);
-    const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], []);
+    
+    // Only use Solana wallets - explicitly configure to avoid MetaMask detection
+    const wallets = useMemo(() => {
+        const phantom = new PhantomWalletAdapter();
+        const solflare = new SolflareWalletAdapter();
+        
+        // Configure adapters explicitly
+        return [phantom, solflare];
+    }, []);
+    
     return (
-        <ConnectionProvider endpoint={endpoint}><WalletProvider wallets={wallets} autoConnect><WalletModalProvider><Dashboard /></WalletModalProvider></WalletProvider></ConnectionProvider>
+        <ConnectionProvider endpoint={endpoint}>
+            <WalletProvider 
+                wallets={wallets} 
+                autoConnect={false}
+                onError={(error) => {
+                    // Silently ignore MetaMask/ethereum errors - we only want Solana wallets
+                    const errorMsg = error?.message || error?.toString() || '';
+                    if (errorMsg.includes('MetaMask') || 
+                        errorMsg.includes('ethereum') || 
+                        errorMsg.includes('Ethereum') ||
+                        errorMsg.includes('Failed to connect')) {
+                        // These are expected - MetaMask detection attempts
+                        return;
+                    }
+                    // Only log actual Solana wallet errors
+                    console.error('Solana wallet error:', error);
+                }}
+            >
+                <WalletModalProvider>
+                    <Dashboard />
+                </WalletModalProvider>
+            </WalletProvider>
+        </ConnectionProvider>
     );
 }
