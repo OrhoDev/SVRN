@@ -26,12 +26,25 @@ try {
     console.warn("tally.json not found. Run 'nargo compile' and copy the json file.");
 }
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const RPC_URL = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
 const PROGRAM_ID = new PublicKey(process.env.PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv"); 
 
-const keypairData = JSON.parse(fs.readFileSync('./relayer-keypair.json', 'utf-8'));
-const relayerWallet = Keypair.fromSecretKey(new Uint8Array(keypairData));
+// Load relayer keypair from environment variable or file
+let relayerWallet: Keypair;
+if (process.env.RELAYER_KEYPAIR) {
+    // From environment variable (base58 encoded secret key)
+    const secretKey = bs58.decode(process.env.RELAYER_KEYPAIR);
+    relayerWallet = Keypair.fromSecretKey(secretKey);
+} else {
+    // From file (for local development)
+    const keypairPath = process.env.RELAYER_KEYPAIR_PATH || './relayer-keypair.json';
+    if (!fs.existsSync(keypairPath)) {
+        throw new Error(`Relayer keypair not found at ${keypairPath}. Set RELAYER_KEYPAIR env var or create keypair file.`);
+    }
+    const keypairData = JSON.parse(fs.readFileSync(keypairPath, 'utf-8'));
+    relayerWallet = Keypair.fromSecretKey(new Uint8Array(keypairData));
+}
 const idl = JSON.parse(fs.readFileSync('./idl.json', 'utf-8'));
 
 const connection = new Connection(RPC_URL, "confirmed");
@@ -41,7 +54,7 @@ const program = new anchor.Program(idl, provider) as any;
 
 const SNAPSHOT_DB: Record<string, any> = {};
 
-console.log("SVRN Sovereign Relayer Online");
+console.log("Solvrn Relayer Online");
 
 // --- ZK KERNEL ---
 let bb: any;
@@ -51,11 +64,19 @@ async function initZK() {
     console.log("   ZK Backend Ready");
 }
 
+// Health check endpoint
+app.get('/health', (req: Request, res: Response) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Initialize ZK before starting server
 async function startServer() {
     await initZK();
     
-    app.listen(PORT, () => console.log(`Relayer listening on http://localhost:${PORT}`));
+    app.listen(PORT, () => {
+        console.log(`Solvrn Relayer listening on http://localhost:${PORT}`);
+        console.log(`Health check: http://localhost:${PORT}/health`);
+    });
 }
 
 startServer();

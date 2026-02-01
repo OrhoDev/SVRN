@@ -60,18 +60,32 @@ try {
 catch (e) {
     console.warn("tally.json not found. Run 'nargo compile' and copy the json file.");
 }
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const RPC_URL = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
 const PROGRAM_ID = new web3_js_1.PublicKey(process.env.PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
-const keypairData = JSON.parse(fs_1.default.readFileSync('./relayer-keypair.json', 'utf-8'));
-const relayerWallet = web3_js_1.Keypair.fromSecretKey(new Uint8Array(keypairData));
+// Load relayer keypair from environment variable or file
+let relayerWallet;
+if (process.env.RELAYER_KEYPAIR) {
+    // From environment variable (base58 encoded secret key)
+    const secretKey = bs58_1.default.decode(process.env.RELAYER_KEYPAIR);
+    relayerWallet = web3_js_1.Keypair.fromSecretKey(secretKey);
+}
+else {
+    // From file (for local development)
+    const keypairPath = process.env.RELAYER_KEYPAIR_PATH || './relayer-keypair.json';
+    if (!fs_1.default.existsSync(keypairPath)) {
+        throw new Error(`Relayer keypair not found at ${keypairPath}. Set RELAYER_KEYPAIR env var or create keypair file.`);
+    }
+    const keypairData = JSON.parse(fs_1.default.readFileSync(keypairPath, 'utf-8'));
+    relayerWallet = web3_js_1.Keypair.fromSecretKey(new Uint8Array(keypairData));
+}
 const idl = JSON.parse(fs_1.default.readFileSync('./idl.json', 'utf-8'));
 const connection = new web3_js_1.Connection(RPC_URL, "confirmed");
 const walletWrapper = new anchor.Wallet(relayerWallet);
 const provider = new anchor.AnchorProvider(connection, walletWrapper, { commitment: "confirmed" });
 const program = new anchor.Program(idl, provider);
 const SNAPSHOT_DB = {};
-console.log("SVRN Sovereign Relayer Online");
+console.log("Solvrn Relayer Online");
 // --- ZK KERNEL ---
 let bb;
 async function initZK() {
@@ -79,10 +93,17 @@ async function initZK() {
     bb = await bb_js_1.Barretenberg.new();
     console.log("   ZK Backend Ready");
 }
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 // Initialize ZK before starting server
 async function startServer() {
     await initZK();
-    app.listen(PORT, () => console.log(`Relayer listening on http://localhost:${PORT}`));
+    app.listen(PORT, () => {
+        console.log(`Solvrn Relayer listening on http://localhost:${PORT}`);
+        console.log(`Health check: http://localhost:${PORT}/health`);
+    });
 }
 startServer();
 // --- NOIR-COMPATIBLE HASHING ---
@@ -207,20 +228,23 @@ app.post('/initialize-snapshot', async (req, res) => {
         const accounts = data.result?.token_accounts || [];
         let voters = accounts.map((acc) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v) => v.balance > 0).slice(0, 256);
-        // PRODUCTION MODE: Always include creator if they have tokens
-        // QUICK FIX: Force add creator at BEGINNING to avoid edge cases
+        // PRODUCTION MODE: Only add creator if they have tokens
         if (creator) {
             const creatorInVoters = voters.find((v) => v.owner === creator);
             if (!creatorInVoters) {
-                // Add creator at the beginning to avoid edge cases
+                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... has no tokens. Not adding to voter list.`);
+                // In production mode, we DON'T force-add creators without tokens
+                // Uncomment the following lines for demo/testing mode:
+                /*
                 voters.unshift({
                     owner: creator,
-                    balance: 1000000 // Default to 1 SOL for now
+                    balance: 1000000 // Default to 1 SOL for demo
                 });
-                console.log(`PRODUCTION MODE: Force-added creator ${creator.slice(0, 6)}... at beginning`);
+                console.log(`DEMO MODE: Force-added creator ${creator.slice(0,6)}... at beginning`);
+                */
             }
             else {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... already in voter list`);
+                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... already in voter list with ${creatorInVoters.balance} tokens`);
             }
         }
         // NOW build voterMap - creator is already in voters array
@@ -276,7 +300,93 @@ app.post('/initialize-snapshot', async (req, res) => {
         res.status(500).json({ success: false, error: e.message });
     }
 });
-// --- DEMO ENDPOINT: Add creator to existing voting tree ---
+// --- PRODUCTION ENDPOINT: Add creator to existing voting tree ---
+app.post('/add-creator', async (req, res) => {
+    try {
+        const { proposalId, creator } = req.body;
+        const propKey = proposalId.toString();
+        if (!SNAPSHOT_DB[propKey]) {
+            return res.status(404).json({ success: false, error: "Proposal not found" });
+        }
+        const snapshot = SNAPSHOT_DB[propKey];
+        const creatorInVoters = snapshot.voterMap[creator];
+        if (creatorInVoters) {
+            return res.json({ success: true, message: "Creator already in voting tree" });
+        }
+        // PRODUCTION MODE: Check actual token balance first
+        console.log(`🔧 PRODUCTION: Checking token balance for creator ${creator.slice(0, 6)}...`);
+        const response = await fetch(RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 'svrn', method: 'getTokenAccounts',
+                params: { mint: snapshot.metadata?.votingMint || "So11111111111111111111111111111111111111112",
+                    limit: 1, options: { showZeroBalance: false },
+                    account: creator }
+            })
+        });
+        const data = await response.json();
+        const accounts = data.result?.token_accounts || [];
+        if (accounts.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: "Creator has no token balance. Cannot add to voting tree."
+            });
+        }
+        const balance = Number(accounts[0].amount);
+        const weight = Math.floor(Math.sqrt(balance));
+        console.log(`✅ PRODUCTION: Creator found with balance ${balance}, weight ${weight}`);
+        const secretVal = deriveSecret(creator);
+        const leaf = await noirHash(secretVal, weight);
+        // Add to voterMap with REAL balance
+        const creatorIndex = Object.keys(snapshot.voterMap).length;
+        snapshot.voterMap[creator] = {
+            index: creatorIndex,
+            balance: balance,
+            weight: weight,
+            secret: "0x" + secretVal.toString(16).padStart(64, '0'),
+            leaf: leaf.toString()
+        };
+        // REBUILD THE MERKLE TREE with the new leaf
+        const voters = Object.values(snapshot.voterMap);
+        const leavesFr = voters.map((v) => {
+            const clean = v.leaf.toString().replace('0x', '');
+            return bb_js_1.Fr.fromString(clean);
+        });
+        // Pad to power of 2 if needed
+        const zeroLeaf = await noirHash(0, 0);
+        let targetSize = 1;
+        while (targetSize < leavesFr.length)
+            targetSize *= 2;
+        while (leavesFr.length < targetSize)
+            leavesFr.push(zeroLeaf);
+        // Rebuild levels
+        const levels = [leavesFr.map(f => f.toString())];
+        let currentLevel = leavesFr;
+        while (currentLevel.length > 1) {
+            const nextLevelFr = [];
+            for (let i = 0; i < currentLevel.length; i += 2) {
+                const left = currentLevel[i];
+                const right = (i + 1 < currentLevel.length) ? currentLevel[i + 1] : currentLevel[i];
+                const parent = await noirHash(left, right);
+                nextLevelFr.push(parent);
+            }
+            currentLevel = nextLevelFr;
+            levels.push(currentLevel.map(f => f.toString()));
+        }
+        // Update the snapshot with new tree
+        const newRoot = levels[levels.length - 1][0];
+        snapshot.root = newRoot;
+        snapshot.levels = levels;
+        console.log(`🔧 PRODUCTION: Rebuilt tree. New root: ${newRoot.slice(0, 16)}...`);
+        res.json({ success: true, message: "Creator added with real token balance", root: newRoot, balance, weight });
+    }
+    catch (e) {
+        console.error("ADD_CREATOR_ERROR:", e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+// --- DEMO ENDPOINT: Add creator with 1 token (for testing only) ---
 app.post('/demo-add-creator', async (req, res) => {
     try {
         const { proposalId, creator } = req.body;
@@ -289,7 +399,7 @@ app.post('/demo-add-creator', async (req, res) => {
         if (creatorInVoters) {
             return res.json({ success: true, message: "Creator already in voting tree" });
         }
-        console.log(`🔧 DEMO: Rebuilding Merkle tree to include creator ${creator.slice(0, 6)}...`);
+        console.log(`🔧 DEMO: Adding creator ${creator.slice(0, 6)}... with 1 token for testing`);
         // Add creator with minimum balance (1 token) for voting rights
         const secretVal = deriveSecret(creator);
         const weight = 1; // sqrt(1) = 1
@@ -311,7 +421,10 @@ app.post('/demo-add-creator', async (req, res) => {
         });
         // Pad to power of 2 if needed
         const zeroLeaf = await noirHash(0, 0);
-        while (leavesFr.length < 8)
+        let targetSize = 1;
+        while (targetSize < leavesFr.length)
+            targetSize *= 2;
+        while (leavesFr.length < targetSize)
             leavesFr.push(zeroLeaf);
         // Rebuild levels
         const levels = [leavesFr.map(f => f.toString())];
@@ -319,7 +432,9 @@ app.post('/demo-add-creator', async (req, res) => {
         while (currentLevel.length > 1) {
             const nextLevelFr = [];
             for (let i = 0; i < currentLevel.length; i += 2) {
-                const parent = await noirHash(currentLevel[i], currentLevel[i + 1]);
+                const left = currentLevel[i];
+                const right = (i + 1 < currentLevel.length) ? currentLevel[i + 1] : currentLevel[i];
+                const parent = await noirHash(left, right);
                 nextLevelFr.push(parent);
             }
             currentLevel = nextLevelFr;
@@ -330,7 +445,7 @@ app.post('/demo-add-creator', async (req, res) => {
         snapshot.root = newRoot;
         snapshot.levels = levels;
         console.log(`🔧 DEMO: Rebuilt tree. New root: ${newRoot.slice(0, 16)}...`);
-        res.json({ success: true, message: "Creator added and tree rebuilt", root: newRoot });
+        res.json({ success: true, message: "Creator added with 1 token (demo mode)", root: newRoot });
     }
     catch (e) {
         console.error("DEMO_ADD_CREATOR_ERROR:", e.message);
@@ -496,7 +611,10 @@ app.get('/vote-counts/:proposalId', async (req, res) => {
             totalVotes: Math.max(proposalVotes.length, yesVotes + noVotes),
             quorumMet: Math.max(proposalVotes.length, yesVotes + noVotes) >= 10, // QUORUM_REQ
             isDemoMode: proposalVotes.length === 0,
-            realVoteCount: proposalVotes.length
+            realVoteCount: proposalVotes.length,
+            // IMPORTANT: yes/no breakdown is simulated until real Arcium MPC decryption is implemented
+            breakdownSimulated: true,
+            warning: proposalVotes.length > 0 ? "Vote decryption is simulated. Real decryption coming soon." : "No votes found. Using demo counts."
         });
     }
     catch (e) {

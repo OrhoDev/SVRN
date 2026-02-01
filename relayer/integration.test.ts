@@ -1,5 +1,5 @@
 /**
- * Integration tests for SVRN Relayer API
+ * Integration tests for Solvrn Relayer API
  * Tests actual API endpoints against a running relayer
  */
 
@@ -17,7 +17,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   return response.json();
 }
 
-describe('SVRN Relayer API Integration Tests', () => {
+describe('Solvrn Relayer API Integration Tests', () => {
   let testProposalId: number;
 
   beforeAll(async () => {

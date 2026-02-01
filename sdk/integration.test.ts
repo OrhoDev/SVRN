@@ -3,7 +3,7 @@
  * Tests actual SDK functionality against a running relayer
  */
 
-import { SvrnClient } from './src/index.js';
+import { SolvrnClient } from './src/index.js';
 import { Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 
@@ -25,8 +25,8 @@ try {
   console.warn('Circuit JSON not found, some tests will be skipped');
 }
 
-describe('SVRN SDK Integration Tests', () => {
-  let client: SvrnClient;
+describe('Solvrn SDK Integration Tests', () => {
+  let client: SolvrnClient;
   let connection: Connection;
   let testUser: Keypair;
   let provider: AnchorProvider;
@@ -47,7 +47,7 @@ describe('SVRN SDK Integration Tests', () => {
   });
 
   beforeEach(() => {
-    client = new SvrnClient(RELAYER_URL, ARCIUM_PROGRAM_ID, PROGRAM_ID);
+    client = new SolvrnClient(RELAYER_URL, ARCIUM_PROGRAM_ID, PROGRAM_ID);
   });
 
   describe('API Endpoints', () => {

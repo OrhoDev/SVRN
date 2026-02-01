@@ -9,6 +9,22 @@
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
+
+# Sensitive files - NEVER COMMIT THESE
+relayer-keypair.json
+relayer/*-keypair.json
+relayer/relayer-keypair.json
+*-keypair.json
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+keys/
+*.secret
+*.private
 
 # IDE
 .vscode/
@@ -29,6 +45,11 @@ build/
 *.bak
 *.backup
 
+# Test files (keep structure, ignore generated)
+coverage/
+*.test.js.map
+*.spec.js.map
+
 # Documentation (keep research docs, ignore generated)
 # Keep: MERKLE_RESEARCH.md, MERKLE_IMPLEMENTATION_PLAN.md
 # Ignore: any auto-generated docs
@@ -38,3 +59,13 @@ node_modules/
 
 # WSL specific
 .wslconfig
+
+# Yarn
+.yarn/
+.yarnrc.yml
+yarn-error.log
+
+# Package manager locks (keep npm, ignore others for now)
+# package-lock.json - KEEP
+# yarn.lock - IGNORE (if using npm)
+# pnpm-lock.yaml - IGNORE
