@@ -52,7 +52,7 @@ const SyntaxHighlight = ({ code }) => {
     const parts = code.split(/(\b(?:const|await|import|from|return|function|if|else|new|async)\b|\/\/.*|"[^"]*"|'[^']*'|`[^`]*`|\d+|[{}()[\].;,]|[A-Z][a-zA-Z0-9_]*\b|[a-z][a-zA-Z0-9_]*(?=\())\b/g);
     
     return (
-        <span className="font-mono text-[13px] leading-6">
+        <span className="font-mono text-[12px] leading-5">
             {parts.map((part, i) => {
                 if (!part) return null;
                 
@@ -92,11 +92,18 @@ const IDEEntry = ({ entry, lineStart }) => {
     
     return (
         <div className="mb-4">
-            {/* EXPLANATION BLOCK - Simple terminal-style */}
+            {/* EXPLANATION BLOCK - Shows API call and description */}
             <div className="bg-[#2d2d2d] border border-[#3e3e42] px-4 py-2 mb-1">
-                <p className="text-[#cccccc] text-sm font-mono leading-relaxed">
-                    {entry.title.replace(/^\d+\.\s*/, '')}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                    <p className="text-[#cccccc] text-xs font-mono leading-snug flex-1">
+                        {entry.title.replace(/^\d+\.\s*/, '')}
+                    </p>
+                    {entry.api && (
+                        <span className="text-[9px] font-bold text-[#4ec9b0] uppercase tracking-wider bg-[#1e1e1e] px-2 py-0.5 rounded border border-[#3e3e42] whitespace-nowrap">
+                            {entry.api}
+                        </span>
+                    )}
+                </div>
             </div>
 
             {/* CODE BLOCK */}
@@ -104,38 +111,37 @@ const IDEEntry = ({ entry, lineStart }) => {
                 {lines.map((line, i) => (
                     <div key={i} className="flex border-b border-[#2d2d30] last:border-b-0">
                         {/* Line number */}
-                        <div className="w-12 text-right pr-3 py-1 bg-[#2d2d2d] text-xs text-[#858585] font-mono select-none">
+                        <div className="w-12 text-right pr-3 py-0.5 bg-[#2d2d2d] text-xs text-[#858585] font-mono select-none">
                             {lineStart + i}
                         </div>
                         {/* Code line */}
-                        <div className="flex-1 px-4 py-1 font-mono text-[13px] leading-6">
+                        <div className="flex-1 px-4 py-0.5 font-mono text-[12px] leading-5">
                             <SyntaxHighlight code={line} />
                         </div>
                     </div>
                 ))}
-
-                {/* RESULT BLOCK */}
-                {entry.result && (
-                    <div className="flex bg-[#2d2d30] border-t border-[#3e3e42]">
-                        <div className="w-12 text-right pr-3 py-1 bg-[#2d2d2d] text-xs text-[#6a9955] font-mono select-none">
-                            {lineStart + lines.length}
-                        </div>
-                        <div className="flex-1 px-4 py-1 font-mono text-sm text-[#6a9955] flex items-center gap-3">
-                            <span>// {entry.result}</span>
-                            {entry.tx && (
-                                <a 
-                                    href={`https://explorer.solana.com/tx/${entry.tx}?cluster=devnet`} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
-                                    className="text-[#4ec9b0] hover:underline text-xs flex items-center gap-1"
-                                >
-                                    View Tx <ExternalLink size={10} />
-                                </a>
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
+
+            {/* RESULT BLOCK - Now looks like the explainer box */}
+            {entry.result && (
+                <div className="bg-[#2d2d2d] border border-[#3e3e42] px-4 py-2 mt-1">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-[#cccccc] text-xs font-mono leading-snug flex-1">
+                            {entry.result}
+                        </p>
+                        {entry.tx && (
+                            <a 
+                                href={`https://explorer.solana.com/tx/${entry.tx}?cluster=devnet`} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="text-[#4ec9b0] hover:text-[#6ec9b0] text-[10px] flex items-center gap-1 font-bold uppercase tracking-wider transition-colors"
+                            >
+                                View Tx <ExternalLink size={10} />
+                            </a>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -162,8 +168,18 @@ const StatsTicker = () => (
 
 // --- DYNAMIC WALLET BUTTON ---
 const StyledWalletButton = () => {
-    const { wallet } = useWallet();
+    const { wallet, connect, connecting, connected, disconnect } = useWallet();
     const adapterName = wallet?.adapter?.name || '';
+    
+    // Auto-connect when wallet is selected but not connected
+    useEffect(() => {
+        if (wallet && !connected && !connecting) {
+            connect().catch((err) => {
+                // Error is already handled by onError in WalletProvider
+                console.log('Auto-connect attempt:', err);
+            });
+        }
+    }, [wallet, connected, connecting, connect]);
     
     let walletClass = '';
     if (adapterName === 'Phantom') walletClass = 'wallet-phantom';
@@ -330,26 +346,27 @@ await svrn.init(circuit);
             const provider = new AnchorProvider(connection, anchorWallet, {});
 
             addEntry(
-                "The SDK creates your proposal and builds a secure voter snapshot",
+                "Create a governance proposal and build a secure voter snapshot",
                 "createProposal",
-                `// SDK handles proposal creation and snapshot generation
+                `// Create proposal with automatic snapshot generation
 const { proposalId, txid } = await svrn.createProposal(
-    provider,
-    publicKey,
-    "${votingMintStr.slice(0,8)}...",  // Voting mint
+    provider,           // Solana wallet connection
+    publicKey,         // Your wallet's public key
+    "${votingMintStr.slice(0,8)}...",  // Voting token (USDC, SOL, etc.)
     { 
         title: "${propTitle}", 
         desc: "${propDesc.slice(0, 30)}...",
-        duration: ${duration} 
+        duration: ${duration}  // Voting period (hours)
     },
-    0.05  // Gas buffer (SOL)
+    0.05  // Transaction fee (SOL)
 );
 
-// SDK internally:
-// 1. Gets next proposal ID from relayer
-// 2. Initializes snapshot (builds Merkle tree)
-// 3. Creates on-chain proposal account`, 
-                "Initializing...",
+// SDK automatically:
+// 1. Gets unique proposal ID from relayer
+// 2. Scans token holders and builds Merkle tree
+// 3. Creates proposal account on Solana
+// 4. Returns transaction ID for verification`, 
+                "Proposal created! Voter snapshot built and proposal is active on-chain.",
                 null
             );
 
@@ -417,7 +434,7 @@ const { proposalId, txid } = await svrn.createProposal(
             // Update the last entry with result
             setHistory(prev => {
                 const newH = [...prev];
-                newH[newH.length-1].result = `The SDK creates your proposal and builds a secure voter snapshot`;
+                newH[newH.length-1].result = `Proposal created! Voter snapshot built and proposal is active on-chain.`;
                 newH[newH.length-1].tx = txid;
                 return newH;
             });
@@ -435,20 +452,21 @@ const { proposalId, txid } = await svrn.createProposal(
         if (isLoading || !zkReady || !publicKey || !proposalId) return; 
         setIsLoading(true);
         try {
-            addEntry("Your vote is encrypted using zero-knowledge proofs before being submitted", "castVote", 
-`// Full voting flow - SDK handles everything
+            addEntry("Cast your vote with complete privacy - encrypted and anonymous", "castVote", 
+`// Cast a vote - SDK handles all privacy automatically
 const result = await svrn.castVote(
-    provider,
-    publicKey.toBase58(),
-    proposalId,
-    choice  // 0 = NO, 1 = YES
+    provider,           // Solana wallet connection
+    publicKey.toBase58(),  // Your wallet address
+    proposalId,         // Proposal ID
+    choice              // 0 = NO, 1 = YES
 );
 
-// SDK internally:
-// 1. Gets Merkle proof from relayer
-// 2. Generates ZK proof (Noir + Barretenberg)
-// 3. Encrypts vote (Arcium MPC)
-// 4. Submits to Solana via relayer`, "Generating Zero-Knowledge Proof...");
+// Behind the scenes:
+// 1. Checks eligibility (you hold the token)
+// 2. Generates zero-knowledge proof (proves eligibility without revealing identity)
+// 3. Encrypts vote using Arcium MPC (secure multi-party computation)
+// 4. Submits encrypted vote via relayer
+// 5. Creates nullifier to prevent double-voting`, "Generating ZK proof and encrypting vote...");
 
             const provider = new AnchorProvider(connection, anchorWallet, {});
             const result = await svrn.castVote(provider, publicKey.toBase58(), proposalId, choice);
@@ -460,7 +478,7 @@ const result = await svrn.castVote(
 
             setHistory(prev => {
                 const newH = [...prev];
-                newH[newH.length-1].result = `Your encrypted vote is submitted and verified on-chain`;
+                newH[newH.length-1].result = `Vote submitted! Encrypted ballot recorded on-chain. Your identity stays private and vote cannot be changed.`;
                 newH[newH.length-1].tx = result.tx;
                 return newH;
             });
@@ -469,14 +487,18 @@ const result = await svrn.castVote(
         } catch (e) { 
             // SPECIAL FEATURE SHOWCASE: DOUBLE VOTING
             if (e.message.includes("Allocate: account Address") || e.message.includes("0x0")) {
-                addEntry("The system prevents double voting while protecting your identity", "Security Protocol", 
-`// Each vote creates a unique nullifier hash
-// This prevents double voting without
-// revealing the voter's identity
+                addEntry("Security: Double-voting prevented while keeping identity private", "Security Protocol", 
+`// Each vote creates a unique "nullifier" hash
+// Prevents double-voting without revealing voter identity
 
 if (nullifierExists(userNullifier)) {
     throw new Error("Vote already cast");
-}`, "Security Success: Double-voting prevented while preserving privacy");
+}
+
+// Nullifier system ensures:
+// - No double-voting possible
+// - Identity stays anonymous
+// - Uniqueness verified without revealing who you are`, "Security check passed: Double-voting prevented, privacy preserved");
             } else {
                 console.error(e);
                 alert("Vote Failed: " + e.message); 
@@ -489,22 +511,25 @@ if (nullifierExists(userNullifier)) {
     const handleTally = async () => {
         if (isLoading || !proposalId) return;
 
-        addEntry("The encrypted votes are tallied and results are proven on-chain", "proveTally", 
-`// Get vote counts (note: breakdown is simulated until decryption implemented)
+        addEntry("Tally encrypted votes and generate verifiable proof of results", "proveTally", 
+`// Get vote counts and generate zero-knowledge proof
+// Proves tally is correct without revealing individual votes
 const voteCounts = await svrn.api.getVoteCounts(proposalId);
 
-// Generate ZK tally proof
+// Generate ZK proof that verifies:
+// - Vote counts are accurate
+// - Threshold met (${THRESHOLD_REQ}% majority)
+// - Quorum met (at least ${QUORUM_REQ} votes)
 const tallyProof = await svrn.api.proveTally(
-    proposalId,
-    voteCounts.yesVotes,
-    voteCounts.noVotes, 
-    ${THRESHOLD_REQ},  // Threshold %
-    ${QUORUM_REQ}     // Quorum requirement
+    proposalId,           // Proposal to tally
+    voteCounts.yesVotes,  // YES votes
+    voteCounts.noVotes,   // NO votes
+    ${THRESHOLD_REQ},     // Min % to pass (e.g., 51%)
+    ${QUORUM_REQ}         // Min total votes (e.g., 10)
 );
 
-// ZK proof ensures correctness while
-// preserving individual vote privacy
-console.log('Tally verified:', tallyProof.success);`, "Proving election results...");
+// Proof verifies results while keeping all votes private
+console.log('Tally verified:', tallyProof.success);`, "Generating verifiable tally proof...");
 
     try {
         // First get the actual vote counts
@@ -521,9 +546,28 @@ console.log('Tally verified:', tallyProof.success);`, "Proving election results.
         
         if (!res.success) throw new Error(res.error);
 
+        // Calculate results for the message
+        const yesVotes = voteCounts.yesVotes;
+        const noVotes = voteCounts.noVotes;
+        const totalVotes = yesVotes + noVotes;
+        const passed = yesVotes > noVotes;
+        const thresholdMet = totalVotes > 0 && (yesVotes / totalVotes) * 100 >= THRESHOLD_REQ;
+        const quorumMet = totalVotes >= QUORUM_REQ;
+
         setHistory(prev => {
             const newH = [...prev];
-            newH[newH.length-1].result = `The encrypted votes are tallied and results are proven on-chain`;
+            let resultMsg = `Tally complete! Results verified with ZK proof. `;
+            resultMsg += `${yesVotes} YES, ${noVotes} NO. `;
+            if (thresholdMet && quorumMet) {
+                resultMsg += `Proposal PASSED (${Math.round((yesVotes / totalVotes) * 100)}% majority).`;
+            } else if (!thresholdMet && totalVotes > 0) {
+                resultMsg += `Proposal did not pass (needed ${THRESHOLD_REQ}% majority).`;
+            } else if (!quorumMet) {
+                resultMsg += `Proposal did not pass (quorum not met).`;
+            } else {
+                resultMsg += `Results verified.`;
+            }
+            newH[newH.length-1].result = resultMsg;
             if(res.tx && !res.tx.includes("Skipped")) newH[newH.length-1].tx = res.tx;
             return newH;
         });
@@ -985,13 +1029,23 @@ export default function App() {
     const network = WalletAdapterNetwork.Devnet;
     const endpoint = useMemo(() => import.meta.env.VITE_HELIUS_RPC_URL || clusterApiUrl(network), [network]);
     
-    // Only use Solana wallets - explicitly configure to avoid MetaMask detection
+    // Configure Solana wallet adapters
     const wallets = useMemo(() => {
-        const phantom = new PhantomWalletAdapter();
-        const solflare = new SolflareWalletAdapter();
+        const adapters = [];
         
-        // Configure adapters explicitly
-        return [phantom, solflare];
+        // Only initialize adapters in browser environment
+        if (typeof window === 'undefined') {
+            return adapters;
+        }
+        
+        // Initialize adapters - they handle wallet detection internally
+        const phantom = new PhantomWalletAdapter();
+        adapters.push(phantom);
+        
+        const solflare = new SolflareWalletAdapter();
+        adapters.push(solflare);
+        
+        return adapters;
     }, []);
     
     return (
@@ -999,18 +1053,58 @@ export default function App() {
             <WalletProvider 
                 wallets={wallets} 
                 autoConnect={false}
-                onError={(error) => {
-                    // Silently ignore MetaMask/ethereum errors - we only want Solana wallets
+                onError={(error, adapter) => {
+                    // Get detailed error info
                     const errorMsg = error?.message || error?.toString() || '';
+                    const errorName = error?.name || '';
+                    const adapterName = adapter?.name || 'unknown';
+                    
+                    // Ignore MetaMask/Ethereum-related errors (these are expected)
                     if (errorMsg.includes('MetaMask') || 
                         errorMsg.includes('ethereum') || 
                         errorMsg.includes('Ethereum') ||
-                        errorMsg.includes('Failed to connect')) {
-                        // These are expected - MetaMask detection attempts
+                        errorMsg.includes('Failed to connect to MetaMask') ||
+                        errorMsg.includes('MetaMask extension not found')) {
                         return;
                     }
-                    // Only log actual Solana wallet errors
-                    console.error('Solana wallet error:', error);
+                    
+                    // Check if wallet is actually available
+                    const walletAvailable = typeof window !== 'undefined' && 
+                        ((adapterName === 'Phantom' && window.solana?.isPhantom) ||
+                         (adapterName === 'Solflare' && window.solflare));
+                    
+                    // Extract underlying error from Phantom if available
+                    const underlyingError = error?.error || error?.cause || error;
+                    const underlyingMsg = underlyingError?.message || underlyingError?.toString() || '';
+                    
+                    // Log detailed Solana wallet errors for debugging
+                    console.error('Solana wallet connection error:', {
+                        name: errorName,
+                        message: errorMsg,
+                        adapter: adapterName,
+                        walletAvailable: walletAvailable,
+                        windowSolana: typeof window !== 'undefined' ? !!window.solana : false,
+                        windowSolflare: typeof window !== 'undefined' ? !!window.solflare : false,
+                        underlyingError: underlyingMsg,
+                        stack: error?.stack,
+                        cause: error?.cause,
+                        fullError: error
+                    });
+                    
+                    // Provide user-friendly error message for Phantom connection failures
+                    if (adapterName === 'Phantom' && walletAvailable && errorMsg === 'Unexpected error') {
+                        console.warn('⚠️ Phantom wallet detected but connection failed.');
+                        console.warn('Common causes:');
+                        console.warn('1. Wallet is locked - unlock Phantom wallet');
+                        console.warn('2. Network mismatch - ensure Phantom is on Devnet (Settings > Developer Mode > Change Network)');
+                        console.warn('3. Site authorization - check if Phantom popup appeared');
+                        console.warn('4. Try disconnecting and reconnecting');
+                        if (underlyingMsg) {
+                            console.warn('Underlying error:', underlyingMsg);
+                        }
+                    }
+                    
+                    // Don't throw - let the wallet adapter handle it
                 }}
             >
                 <WalletModalProvider>

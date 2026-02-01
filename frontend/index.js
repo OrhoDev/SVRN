@@ -22,7 +22,7 @@ document.getElementById('submit').addEventListener('click', async () => {
   logs.innerHTML = '<h3>Logs</h3>'; 
   
   try {
-    // --- SOLVOTE INPUTS ---
+    // --- SVRN INPUTS ---
     // In a real app, these come from the wallet and UI
     const inputs = {
         balance: 100,           // User has 100 credits
