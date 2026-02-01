@@ -72,13 +72,32 @@ export class SolvrnApi {
         return this.get(`vote-counts/${proposalId}`);
     }
 
+    // --- PRIVACY-PRESERVING PROPOSAL CREATION ---
+    // Creates proposal via relayer (creator identity hidden on-chain)
+    async createProposal(
+        proposalId: number,
+        votingMint: string,
+        metadata: ProposalMetadata,
+        creator: string,
+        targetWallet?: string
+    ): Promise<{ success: boolean; tx?: string; proposalId?: string; root?: string; voterCount?: number; error?: string }> {
+        return this.post('create-proposal', {
+            proposalId,
+            votingMint,
+            metadata,
+            creator,
+            targetWallet
+        });
+    }
+
     private async post(endpoint: string, body: any) {
         // SECURITY: Validate endpoint to prevent demo/admin access
         const allowedEndpoints = [
             'initialize-snapshot',
             'get-proof', 
             'relay-vote',
-            'prove-tally'
+            'prove-tally',
+            'create-proposal'
         ];
         
         if (!allowedEndpoints.includes(endpoint)) {

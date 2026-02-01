@@ -1,7 +1,8 @@
 import { getMXEPublicKey, RescueCipher, x25519 } from "@arcium-hq/client";
 import { PublicKey } from "@solana/web3.js";
-import { Buffer } from "buffer";
 import { AnchorProvider } from "@coral-xyz/anchor";
+
+// Use global Buffer (provided by Node.js or browser polyfill)
 
 export class SolvrnEncryption {
     private programId: PublicKey;

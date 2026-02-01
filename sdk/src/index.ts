@@ -1,31 +1,8 @@
 import { SolvrnApi, ProposalMetadata } from './api.js';
 import { SolvrnProver } from './prover.js';
 import { SolvrnEncryption } from './encryption.js';
-import { getWalletSecret } from './utils.js';
-import { AnchorProvider, Program } from '@coral-xyz/anchor';
-import BN from 'bn.js';
-import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import idl from './idl.json' with { type: 'json' };
-import { hexToBytes } from './utils.js';
-
-let PROGRAM_ID: PublicKey | null = null;
-
-const getProgramId = (): PublicKey => {
-    if (PROGRAM_ID) return PROGRAM_ID;
-    
-    const id = (globalThis as any).process?.env?.PROGRAM_ID || 
-              process.env.PROGRAM_ID;
-    
-    if (!id) {
-        throw new Error("PROGRAM_ID environment variable required. Please set process.env.PROGRAM_ID in your application or pass programId to SolvrnClient constructor.");
-    }
-    
-    PROGRAM_ID = new PublicKey(id);
-    return PROGRAM_ID;
-};
-// LEGACY TOKEN PROGRAM
-const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+import { AnchorProvider } from '@coral-xyz/anchor';
+import { PublicKey } from '@solana/web3.js';
 
 export class SolvrnClient {
     public api: SolvrnApi;
@@ -49,7 +26,18 @@ export class SolvrnClient {
         await this.prover.init(circuitJson);
     }
 
-  public async createProposal(
+  /**
+     * Create a proposal with privacy-preserving mode.
+     * The proposal is created via the relayer - creator identity is NOT stored on-chain.
+     * 
+     * @param provider - AnchorProvider (still needed for connection info)
+     * @param authorityPubkey - Creator's public key (stored off-chain only)
+     * @param votingMint - Token mint for voting eligibility
+     * @param metadata - Proposal title, description, duration
+     * @param gasBufferSol - (deprecated, relayer pays gas now)
+     * @param proposalIdOverride - Optional specific proposal ID
+     */
+    public async createProposal(
         provider: AnchorProvider,
         authorityPubkey: PublicKey,
         votingMint: string,
@@ -64,65 +52,27 @@ export class SolvrnClient {
              proposalId = nextId;
         }
 
-        // --- UPDATED: Pass Authority Pubkey ---
-        const snap = await this.api.initializeSnapshot(
-            proposalId, 
-            votingMint, 
+        console.log("SDK: Creating proposal via relayer (privacy mode)");
+        console.log(`   Proposal ID: ${proposalId}`);
+        console.log(`   Creator: ${authorityPubkey.toBase58().slice(0, 8)}... (hidden on-chain)`);
+
+        // Create proposal via relayer - relayer signs the on-chain tx
+        // Creator identity is stored off-chain only
+        const result = await this.api.createProposal(
+            proposalId,
+            votingMint,
             metadata,
-            authorityPubkey.toBase58() // <--- Force Creator into Snapshot
+            authorityPubkey.toBase58(),
+            authorityPubkey.toBase58() // targetWallet defaults to creator
         );
-        
-        if (!snap.success) throw new Error(snap.error || "Snapshot failed.");
 
-        // 2. Build On-Chain TX
-        const program = new Program(idl as any, provider) as any;
-        console.log("SDK CALLING PROGRAM ID:", program.programId.toBase58());
-        
-        // PROPOSAL PDA (Synced Seed: svrn_v5)
-        const [pda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("svrn_v5"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], 
-            getProgramId()
-        );
-        
-        // VAULT PDA (Strict Legacy)
-        const [vault] = PublicKey.findProgramAddressSync(
-            [
-                pda.toBuffer(), 
-                TOKEN_PROGRAM_ID.toBuffer(), // Legacy
-                new PublicKey(votingMint).toBuffer()
-            ], 
-            ASSOCIATED_TOKEN_PROGRAM_ID
-        );
-        
-        const tx = await (program.methods as any).initializeProposal(new BN(proposalId), hexToBytes(snap.root), new BN(1000))
-            .accounts({ 
-                proposal: pda, 
-                proposalTokenAccount: vault, 
-                authority: authorityPubkey, 
-                votingMint: new PublicKey(votingMint), 
-                treasuryMint: new PublicKey(votingMint),
-                targetWallet: authorityPubkey,
-                tokenProgram: TOKEN_PROGRAM_ID, // Strict Legacy
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,  
-                systemProgram: SystemProgram.programId 
-            })
-            .transaction();
-        
-        tx.add(SystemProgram.transfer({
-            fromPubkey: authorityPubkey,
-            toPubkey: pda,
-            lamports: gasBufferSol * LAMPORTS_PER_SOL
-        }));
+        if (!result.success) {
+            throw new Error(result.error || "Failed to create proposal");
+        }
 
-        const { blockhash } = await provider.connection.getLatestBlockhash();
-        tx.recentBlockhash = blockhash;
-        tx.feePayer = authorityPubkey;
+        console.log(`   ✅ Proposal created: ${result.tx?.slice(0, 16)}...`);
 
-        const signedTx = await provider.wallet.signTransaction(tx);
-        const txid = await provider.connection.sendRawTransaction(signedTx.serialize());
-        await provider.connection.confirmTransaction(txid);
-
-        return { proposalId, txid };
+        return { proposalId, txid: result.tx };
     }
 
     public async castVote(

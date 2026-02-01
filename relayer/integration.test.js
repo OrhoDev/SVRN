@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Integration tests for SVRN Relayer API
+ * Integration tests for Solvrn Relayer API
  * Tests actual API endpoints against a running relayer
  */
 const RELAYER_URL = process.env.RELAYER_URL || 'http://localhost:3000';
@@ -15,7 +15,7 @@ async function fetchAPI(endpoint, options = {}) {
     });
     return response.json();
 }
-describe('SVRN Relayer API Integration Tests', () => {
+describe('Solvrn Relayer API Integration Tests', () => {
     let testProposalId;
     beforeAll(async () => {
         // Get a test proposal ID

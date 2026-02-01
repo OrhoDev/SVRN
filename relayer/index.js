@@ -46,6 +46,7 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const bs58_1 = __importDefault(require("bs58"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const spl_token_1 = require("@solana/spl-token");
 const bn_js_1 = require("bn.js");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -297,6 +298,127 @@ app.post('/initialize-snapshot', async (req, res) => {
     }
     catch (e) {
         console.error("SNAPSHOT_ERROR:", e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+// ==========================================
+// PRIVACY-PRESERVING PROPOSAL CREATION
+// Relayer creates proposal on-chain (creator identity hidden)
+// ==========================================
+const CREATOR_DB = {};
+app.post('/create-proposal', async (req, res) => {
+    try {
+        if (!bb)
+            return res.status(503).json({ error: "ZK Backend initializing..." });
+        const { votingMint, proposalId, metadata, creator, targetWallet } = req.body;
+        if (!votingMint || !proposalId || !creator) {
+            return res.status(400).json({ success: false, error: "Missing required fields: votingMint, proposalId, creator" });
+        }
+        const propKey = proposalId.toString();
+        console.log(`\n=== CREATE-PROPOSAL (Privacy Mode) ===`);
+        console.log(`   Proposal ID: ${propKey}`);
+        console.log(`   Creator: ${creator.slice(0, 8)}... (hidden on-chain)`);
+        console.log(`   Voting Mint: ${votingMint.slice(0, 8)}...`);
+        // 1. Initialize snapshot (same logic as /initialize-snapshot)
+        const response = await fetch(RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 'svrn', method: 'getTokenAccounts',
+                params: { mint: votingMint, limit: 1000, options: { showZeroBalance: false } }
+            })
+        });
+        const data = await response.json();
+        const accounts = data.result?.token_accounts || [];
+        let voters = accounts.map((acc) => ({ owner: acc.owner, balance: Number(acc.amount) }))
+            .filter((v) => v.balance > 0).slice(0, 256);
+        // Add creator to voters if not already in list (for demo/testing)
+        if (creator) {
+            const creatorInVoters = voters.find((v) => v.owner === creator);
+            if (!creatorInVoters) {
+                // For demo: add creator with minimal balance
+                voters.unshift({ owner: creator, balance: 1000000 });
+                console.log(`   Added creator to voter list (demo mode)`);
+            }
+        }
+        if (voters.length === 0) {
+            return res.status(400).json({ success: false, error: "No token holders found" });
+        }
+        // Build Merkle tree
+        const leavesFr = [];
+        const voterMap = {};
+        for (let i = 0; i < voters.length; i++) {
+            const v = voters[i];
+            const secretVal = deriveSecret(v.owner);
+            const weight = Math.floor(Math.sqrt(v.balance));
+            const leaf = await noirHash(secretVal, weight);
+            leavesFr.push(leaf);
+            voterMap[v.owner] = {
+                index: i,
+                balance: v.balance,
+                weight: weight,
+                secret: "0x" + secretVal.toString(16),
+                leaf: leaf.toString()
+            };
+        }
+        const zeroLeaf = await noirHash(0, 0);
+        while (leavesFr.length < 256)
+            leavesFr.push(zeroLeaf);
+        const levels = [leavesFr.map(f => f.toString())];
+        let currentLevel = leavesFr;
+        while (currentLevel.length > 1) {
+            const nextLevelFr = [];
+            for (let i = 0; i < currentLevel.length; i += 2) {
+                const left = currentLevel[i];
+                const right = (i + 1 < currentLevel.length) ? currentLevel[i + 1] : currentLevel[i];
+                const parent = await noirHash(left, right);
+                nextLevelFr.push(parent);
+            }
+            currentLevel = nextLevelFr;
+            levels.push(currentLevel.map(f => f.toString()));
+        }
+        const root = levels[levels.length - 1][0];
+        // Save snapshot
+        SNAPSHOT_DB[propKey] = { root, voterMap, levels, metadata: metadata || {} };
+        console.log(`   Snapshot built. Root: ${root.slice(0, 16)}...`);
+        // 2. Create proposal on-chain (RELAYER signs, not creator)
+        const proposalBn = new bn_js_1.BN(proposalId);
+        const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+        // Convert merkle root to bytes
+        const rootHex = root.replace('0x', '').padStart(64, '0');
+        const merkleRootBytes = [];
+        for (let i = 0; i < 64; i += 2) {
+            merkleRootBytes.push(parseInt(rootHex.substr(i, 2), 16));
+        }
+        const votingMintPubkey = new web3_js_1.PublicKey(votingMint);
+        const targetWalletPubkey = targetWallet ? new web3_js_1.PublicKey(targetWallet) : relayerWallet.publicKey;
+        console.log(`   Creating on-chain proposal...`);
+        console.log(`   Authority (on-chain): ${relayerWallet.publicKey.toBase58().slice(0, 8)}... (relayer)`);
+        const tx = await program.methods.initializeProposal(proposalBn, merkleRootBytes, new bn_js_1.BN(1000) // execution_amount
+        ).accounts({
+            proposal: proposalPda,
+            votingMint: votingMintPubkey,
+            treasuryMint: votingMintPubkey,
+            targetWallet: targetWalletPubkey,
+            authority: relayerWallet.publicKey,
+            tokenProgram: spl_token_1.TOKEN_PROGRAM_ID,
+            associatedTokenProgram: spl_token_1.ASSOCIATED_TOKEN_PROGRAM_ID,
+            systemProgram: anchor.web3.SystemProgram.programId
+        }).signers([relayerWallet]).rpc();
+        console.log(`   ✅ Proposal created on-chain: ${tx.slice(0, 16)}...`);
+        // 3. Store creator mapping off-chain (for finalization later)
+        CREATOR_DB[propKey] = { creator, createdAt: Date.now() };
+        res.json({
+            success: true,
+            tx,
+            proposalId: propKey,
+            root,
+            voterCount: voters.length,
+            message: "Proposal created with privacy-preserving mode (creator hidden on-chain)"
+        });
+    }
+    catch (e) {
+        console.error("CREATE_PROPOSAL_ERROR:", e.message);
         res.status(500).json({ success: false, error: e.message });
     }
 });

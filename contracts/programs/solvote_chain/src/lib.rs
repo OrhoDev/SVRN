@@ -13,11 +13,12 @@ pub mod solvote_chain {
         proposal_id: u64, 
         merkle_root: [u8; 32],
         execution_amount: u64,
+        creator_commitment: [u8; 32],
     ) -> Result<()> {
         let proposal = &mut ctx.accounts.proposal;
         
         proposal.proposal_id = proposal_id;
-        proposal.authority = ctx.accounts.authority.key();
+        proposal.creator_commitment = creator_commitment;  // Store commitment instead of wallet address
         proposal.merkle_root = merkle_root;
         proposal.tally_result = 0; 
         proposal.is_executed = false;
@@ -27,7 +28,7 @@ pub mod solvote_chain {
         proposal.voting_mint = ctx.accounts.voting_mint.key();
         proposal.treasury_mint = ctx.accounts.treasury_mint.key();
     
-        msg!("DAO::INIT >> Proposal #{} (v2) initialized.", proposal_id);
+        msg!("DAO::INIT >> Proposal #{} (v3 - privacy-preserving) initialized.", proposal_id);
         Ok(())
     }
 
@@ -104,7 +105,7 @@ pub mod solvote_chain {
 pub struct InitProposal<'info> {
     #[account(
         init,
-        payer = authority,
+        payer = relayer,
         space = 8 + 8 + 8 + 32 + 32 + 32 + 8 + 32 + 32 + 32 + 1 + 1 + 64,
         seeds = [b"svrn_v5", proposal_id.to_le_bytes().as_ref()],
         bump
@@ -113,7 +114,7 @@ pub struct InitProposal<'info> {
 
     #[account(
         init,
-        payer = authority,
+        payer = relayer,
         associated_token::mint = treasury_mint,
         associated_token::authority = proposal,
         // Legacy Token Program is implied by the type Account<'info, TokenAccount>
@@ -127,7 +128,7 @@ pub struct InitProposal<'info> {
     pub target_wallet: UncheckedAccount<'info>,
 
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub relayer: Signer<'info>,  // Relayer signs instead of creator (privacy-preserving)
 
     pub token_program: Program<'info, Token>, // Strict Legacy Token Program
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -141,7 +142,6 @@ pub struct FinalizeProposal<'info> {
         mut,
         seeds = [b"svrn_v5", proposal.proposal_id.to_le_bytes().as_ref()],
         bump,
-        has_one = authority,
         has_one = target_wallet,
         has_one = treasury_mint
     )]
@@ -166,7 +166,7 @@ pub struct FinalizeProposal<'info> {
 
     pub treasury_mint: Account<'info, Mint>,
 
-    pub authority: Signer<'info>, 
+    pub relayer: Signer<'info>,  // Relayer can finalize (or verify creator via commitment off-chain)
     pub token_program: Program<'info, Token>, // Strict Legacy
 }
 
@@ -192,7 +192,7 @@ pub struct SubmitVote<'info> {
 pub struct Proposal {
     pub proposal_id: u64,
     pub vote_count: u64,
-    pub authority: Pubkey,
+    pub creator_commitment: [u8; 32],  // Commitment to creator identity (privacy-preserving)
     pub merkle_root: [u8; 32],
     pub voting_mint: Pubkey,   
     pub treasury_mint: Pubkey, 
