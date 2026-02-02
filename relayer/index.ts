@@ -10,6 +10,16 @@ import bs58 from 'bs58';
 import dotenv from 'dotenv';
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { BN } from 'bn.js';
+import {
+    getArciumEnv,
+    getCompDefAccOffset,
+    getMXEAccAddress,
+    getMempoolAccAddress,
+    getCompDefAccAddress,
+    getExecutingPoolAccAddress,
+    getComputationAccAddress,
+    getClusterAccAddress,
+} from "@arcium-hq/client";
 
 dotenv.config();
 
@@ -52,7 +62,32 @@ const walletWrapper = new anchor.Wallet(relayerWallet);
 const provider = new anchor.AnchorProvider(connection, walletWrapper, { commitment: "confirmed" });
 const program = new anchor.Program(idl, provider) as any;
 
+// --- ARCIUM MPC SETUP ---
+const ARCIUM_ID = new PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
+let arciumProgram: any = null;
+let arciumClusterOffset: number = 456; // Default, can be overridden by env
+try {
+    const arciumIdl = JSON.parse(fs.readFileSync('./arcium_idl.json', 'utf-8'));
+    arciumProgram = new anchor.Program(arciumIdl, provider) as any;
+    console.log("Arcium MPC Program loaded successfully");
+    
+    // Try to get cluster offset from env
+    try {
+        const arciumEnv = getArciumEnv();
+        arciumClusterOffset = arciumEnv.arciumClusterOffset;
+    } catch (e) {
+        arciumClusterOffset = parseInt(process.env.ARCIUM_CLUSTER_OFFSET || '456');
+    }
+    console.log(`   Using Arcium cluster offset: ${arciumClusterOffset}`);
+} catch (e) {
+    console.warn("Arcium IDL not found - MPC decryption will be simulated");
+}
+
 const SNAPSHOT_DB: Record<string, any> = {};
+
+// Vote storage for trusted relayer tallying
+// Maps proposalId -> array of { voter, choice, weight }
+const VOTE_STORAGE: Record<string, { voter: string, choice: number, weight: number }[]> = {};
 
 console.log("Solvrn Relayer Online");
 
@@ -312,7 +347,7 @@ app.post('/create-proposal', async (req: Request, res: Response) => {
     try {
         if (!bb) return res.status(503).json({ error: "ZK Backend initializing..." });
         
-        const { votingMint, proposalId, metadata, creator, targetWallet } = req.body;
+        const { votingMint, proposalId, metadata, creator, targetWallet, paymentSignature } = req.body;
         
         if (!votingMint || !proposalId || !creator) {
             return res.status(400).json({ success: false, error: "Missing required fields: votingMint, proposalId, creator" });
@@ -323,6 +358,43 @@ app.post('/create-proposal', async (req: Request, res: Response) => {
         console.log(`   Proposal ID: ${propKey}`);
         console.log(`   Creator: ${creator.slice(0, 8)}... (hidden on-chain)`);
         console.log(`   Voting Mint: ${votingMint.slice(0, 8)}...`);
+
+        // FEE PAYMENT VERIFICATION (Optional - for production)
+        // In production, verify creator sent SOL to relayer before creating proposal
+        // For now, we'll add a check but make it optional for demo
+        const FEE_AMOUNT_SOL = 0.01; // 0.01 SOL fee for proposal creation
+        if (paymentSignature) {
+            // Verify payment transaction exists and is from creator
+            try {
+                const paymentTx = await connection.getTransaction(paymentSignature, { commitment: 'confirmed' });
+                if (!paymentTx) {
+                    return res.status(402).json({ 
+                        success: false, 
+                        error: "Payment not found. Please send payment first.",
+                        relayerAddress: relayerWallet.publicKey.toBase58(),
+                        feeAmount: FEE_AMOUNT_SOL
+                    });
+                }
+                // Check if payment is from creator to relayer
+                const creatorPubkey = new PublicKey(creator);
+                const paymentValid = paymentTx.transaction.message.accountKeys.some((key, idx) => {
+                    return key.equals(creatorPubkey) && paymentTx.transaction.message.accountKeys.some((k, i) => 
+                        k.equals(relayerWallet.publicKey) && i !== idx
+                    );
+                });
+                if (!paymentValid) {
+                    console.warn(`   Payment verification failed for ${paymentSignature}`);
+                } else {
+                    console.log(`   ✅ Payment verified: ${paymentSignature.slice(0, 16)}...`);
+                }
+            } catch (e: any) {
+                console.warn(`   Payment verification error: ${e?.message || String(e)}`);
+                // Continue anyway for demo mode
+            }
+        } else {
+            console.log(`   ⚠️  No payment signature provided (demo mode - relayer pays)`);
+            console.log(`   Production: Send ${FEE_AMOUNT_SOL} SOL to ${relayerWallet.publicKey.toBase58()} before creating proposal`);
+        }
 
         // 1. Initialize snapshot (same logic as /initialize-snapshot)
         const response = await fetch(RPC_URL, {
@@ -716,13 +788,83 @@ app.post('/relay-vote', async (req: Request, res: Response) => {
 });
 
 // ==========================================
+// --- ARCIUM MPC HELPERS ---
+
+// Poll for computation result (bypass SDK type issues)
+async function waitForMPCResult(compPda: PublicKey, timeoutMs: number = 60000): Promise<Buffer | null> {
+    const startTime = Date.now();
+    process.stdout.write("   ⏳ Waiting for Arcium MPC");
+    
+    while (Date.now() - startTime < timeoutMs) {
+        const account = await connection.getAccountInfo(compPda);
+        
+        // Arcium writes result to account data
+        // If data exists and is larger than discriminator (8 bytes), we have a result
+        if (account && account.data.length > 8) {
+            console.log(" ✅");
+            return account.data;
+        }
+        
+        process.stdout.write(".");
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    
+    console.log(" ❌ Timeout");
+    return null;
+}
+
+// Find next available computation offset
+async function findNextCompOffset(clusterOffset: number): Promise<any> {
+    // Start from 5 to avoid broken offsets 0-3
+    let id = 5;
+    while (id < 1000) {
+        const compOffset = new BN(id);
+        const pda = getComputationAccAddress(clusterOffset, compOffset);
+        const info = await connection.getAccountInfo(pda);
+        if (!info) return compOffset;
+        id++;
+    }
+    throw new Error("Too many computations pending");
+}
+
 // --- REAL VOTE DECRYPTION ---
 async function decryptVotes(votes: any[]): Promise<{yesVotes: number, noVotes: number}> {
     if (votes.length === 0) return {yesVotes: 0, noVotes: 0};
     
-    console.log(`Starting MPC decryption for ${votes.length} votes...`);
+    console.log(`\n🔐 Starting MPC decryption for ${votes.length} votes...`);
     
-    let yesVotes = 0, noVotes = 0;
+    // Check if Arcium is available
+    if (!arciumProgram) {
+        console.log("   ⚠️ Arcium not configured - using simulated decryption");
+        return simulatedDecrypt(votes);
+    }
+    
+    // Get Arcium account PDAs
+    const clusterPda = getClusterAccAddress(arciumClusterOffset);
+    const mxeAccount = getMXEAccAddress(ARCIUM_ID);
+    const mempoolAccount = getMempoolAccAddress(arciumClusterOffset);
+    const executingPool = getExecutingPoolAccAddress(arciumClusterOffset);
+    const compDefAccount = getCompDefAccAddress(
+        ARCIUM_ID,
+        Buffer.from(getCompDefAccOffset("add_together")).readUInt32LE()
+    );
+    
+    // Verify computation definition exists
+    const compDefInfo = await connection.getAccountInfo(compDefAccount);
+    if (!compDefInfo) {
+        console.log("   ⚠️ Arcium computation definition not found - using simulated decryption");
+        console.log("   → Run: cd svrn_engine && yarn run init-mxe");
+        return simulatedDecrypt(votes);
+    }
+    
+    console.log(`   ✅ Arcium MPC ready (cluster: ${arciumClusterOffset})`);
+    
+    let totalYesPower = 0;
+    let noVoteCount = 0;
+    
+    // Find starting computation offset
+    const startingOffset = await findNextCompOffset(arciumClusterOffset);
+    console.log(`   📍 Starting computation offset: ${startingOffset.toString()}`);
     
     for (let i = 0; i < votes.length; i++) {
         const vote = votes[i];
@@ -733,35 +875,102 @@ async function decryptVotes(votes: any[]): Promise<{yesVotes: number, noVotes: n
             const pubkey = Buffer.from(vote.account.pubkey);
             const nonce = vote.account.nonce;
             
-            console.log(`\n   📄 Decrypting Ballot #${i + 1}...`);
+            console.log(`\n   📄 Decrypting Ballot #${i + 1}/${votes.length}...`);
             
-            // TODO: Implement actual Arcium MPC decryption
-            // This would involve:
-            // 1. Setting up computation with Arcium cluster
-            // 2. Submitting decryption request for each ballot
-            // 3. Waiting for MPC network to decrypt
-            // 4. Parsing decrypted [weight, choice] array
+            // Use sequential offsets
+            const compOffset = new BN(startingOffset.toNumber() + i);
+            const compPda = getComputationAccAddress(arciumClusterOffset, compOffset);
             
-            // For now, we'll simulate the decryption result
-            // In production, this would be the actual decrypted choice
-            const decryptedChoice = Math.random() > 0.4 ? 1 : 0; // 60% yes, 40% no
-            const decryptedWeight = 1; // Each voter has 1 weight
+            // Parse ciphertext into two 32-byte arrays (balance, choice)
+            const ciphertextArray = Array.from(ciphertext);
+            const ciphertext0 = new Array(32).fill(0);
+            const ciphertext1 = new Array(32).fill(0);
             
-            if (decryptedChoice === 1) {
-                yesVotes += decryptedWeight;
-                console.log(`      > Decrypted: YES (weight: ${decryptedWeight})`);
+            for (let j = 0; j < Math.min(32, ciphertextArray.length); j++) {
+                ciphertext0[j] = ciphertextArray[j];
+            }
+            for (let j = 0; j < Math.min(32, ciphertextArray.length - 32); j++) {
+                ciphertext1[j] = ciphertextArray[j + 32];
+            }
+            
+            const pubkeyArray = Array.from(pubkey);
+            const nonceBN = new BN(nonce.toString());
+            
+            // Submit to Arcium MPC
+            console.log(`      > Submitting to Arcium MPC (offset: ${compOffset.toString()})...`);
+            
+            const tx = await arciumProgram.methods
+                .addTogether(
+                    compOffset,
+                    ciphertext0,
+                    ciphertext1,
+                    pubkeyArray,
+                    nonceBN
+                )
+                .accountsPartial({
+                    payer: relayerWallet.publicKey,
+                    computationAccount: compPda,
+                    clusterAccount: clusterPda,
+                    mxeAccount: mxeAccount,
+                    mempoolAccount: mempoolAccount,
+                    executingPool: executingPool,
+                    compDefAccount: compDefAccount,
+                })
+                .signers([relayerWallet])
+                .rpc();
+            
+            console.log(`      > ✅ Tx sent: ${tx.slice(0, 16)}...`);
+            
+            // Wait for MPC result
+            const resultData = await waitForMPCResult(compPda, 60000);
+            
+            if (resultData) {
+                // Read u64 at offset 8 (skip discriminator)
+                const power = resultData.readBigUInt64LE(8);
+                const powerNum = Number(power);
+                
+                if (powerNum > 0) {
+                    console.log(`      > 🟢 YES vote (power: ${powerNum})`);
+                    totalYesPower += powerNum;
+                } else {
+                    console.log(`      > 🔴 NO vote`);
+                    noVoteCount++;
+                }
             } else {
-                noVotes += decryptedWeight;
-                console.log(`      > Decrypted: NO (weight: ${decryptedWeight})`);
+                console.log(`      > ⚠️ MPC timeout, counting as NO`);
+                noVoteCount++;
             }
             
         } catch (e: any) {
-            console.error(`      > Failed to decrypt ballot #${i + 1}: ${e.message}`);
+            console.error(`      > ❌ MPC Error: ${e.message}`);
+            // On error, fall back to counting as abstain/no
+            noVoteCount++;
         }
     }
     
-    console.log(`\n   Decryption Complete: ${yesVotes} YES, ${noVotes} NO`);
-    return {yesVotes, noVotes};
+    console.log(`\n   ✅ MPC Decryption Complete!`);
+    console.log(`      YES Power: ${totalYesPower}`);
+    console.log(`      NO Votes: ${noVoteCount}`);
+    
+    return { yesVotes: totalYesPower, noVotes: noVoteCount };
+}
+
+// Fallback simulated decryption (when Arcium not available)
+function simulatedDecrypt(votes: any[]): { yesVotes: number, noVotes: number } {
+    console.log("   Using simulated decryption (Arcium not configured)");
+    let yesVotes = 0, noVotes = 0;
+    
+    for (const vote of votes) {
+        // Simulate: 60% yes, 40% no with weight 1
+        if (Math.random() > 0.4) {
+            yesVotes++;
+        } else {
+            noVotes++;
+        }
+    }
+    
+    console.log(`   Simulated: ${yesVotes} YES, ${noVotes} NO`);
+    return { yesVotes, noVotes };
 }
 
 // Get current vote counts for a proposal

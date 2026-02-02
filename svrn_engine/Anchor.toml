@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-svrn_engine = "DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS"
+svrn_engine = "FHo9Gz5DzQiUUU4aNCED6JFu33D7JwGiywqwRx3TBrhm"
 
 [registry]
 url = "https://api.apr.dev"
