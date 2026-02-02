@@ -21,8 +21,7 @@ export default defineConfig({
   
   optimizeDeps: {
     // Exclude these so Vite doesn't try to bundle the WASM binaries
-    exclude: ['@aztec/bb.js', '@noir-lang/noir_js', '@noir-lang/backend_barretenberg'],
-    include: ['solvrn-sdk'],
+    exclude: ['@aztec/bb.js', '@noir-lang/noir_js', '@noir-lang/backend_barretenberg', 'solvrn-sdk'],
     esbuildOptions: {
       target: 'esnext',
     },
