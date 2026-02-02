@@ -96,76 +96,76 @@ constructor(
 
 ## What's Real
 
-✅ **Real ZK Proofs** - Uses Barretenberg WASM + Noir circuits  
-✅ **Real Encryption** - Arcium MPC encryption  
-✅ **Real On-Chain** - Actual Solana transactions  
-✅ **Real Merkle Trees** - Built from actual token holders  
-✅ **Real Nullifiers** - Prevents double voting  
-✅ **Real Vote Storage** - Encrypted votes stored on-chain
+**Real ZK Proofs** - Uses Barretenberg WASM + Noir circuits  
+**Real Encryption** - Arcium MPC encryption  
+**Real On-Chain** - Actual Solana transactions  
+**Real Merkle Trees** - Built from actual token holders  
+**Real Nullifiers** - Prevents double voting  
+**Real Vote Storage** - Encrypted votes stored on-chain
 
 ## Current Limitations
 
-⚠️ **Vote Decryption** - Currently simulated (relayer-side). Real Arcium MPC decryption coming soon.  
-⚠️ **Vote Count Breakdown** - `getVoteCounts()` returns simulated yes/no breakdown. The total vote count (`realVoteCount`) is accurate.  
-✅ **Tally Proofs** - Work perfectly with user-provided vote counts. ZK proofs are 100% real.
+**Vote Decryption** - Currently simulated (relayer-side). Real Arcium MPC decryption coming soon.  
+**Vote Count Breakdown** - `getVoteCounts()` returns simulated yes/no breakdown. The total vote count (`realVoteCount`) is accurate.  
+**Tally Proofs** - Work perfectly with user-provided vote counts. ZK proofs are 100% real.
 
 ## Important: Using Tally in Production
 
-**⚠️ CRITICAL:** `proveTally()` generates REAL ZK proofs, but if you use `getVoteCounts()` for vote counts, you'll be proving SIMULATED data.
+**CRITICAL:** `proveTally()` generates REAL ZK proofs, but if you use `getVoteCounts()` for vote counts, you'll be proving SIMULATED data.
 
-### ✅ Full Flow (With Limitation):
+### Full Flow (With Limitation):
 
 ```typescript
-// 1. Create proposal ✅ REAL
+// 1. Create proposal (REAL)
 const { proposalId } = await solvrn.createProposal(...);
 
-// 2. Cast vote ✅ REAL  
+// 2. Cast vote (REAL)
 await solvrn.castVote(provider, wallet, proposalId, 1);
 
-// 3. Get vote counts ⚠️ PARTIALLY REAL
+// 3. Get vote counts (PARTIALLY REAL)
 const counts = await solvrn.api.getVoteCounts(proposalId);
-// counts.realVoteCount ✅ - Accurate total
-// counts.yesVotes/noVotes ⚠️ - Simulated breakdown
+// counts.realVoteCount - Accurate total
+// counts.yesVotes/noVotes - Simulated breakdown
 
-// 4. Prove tally ⚠️ REAL PROOF, BUT PROVING SIMULATED DATA
+// 4. Prove tally (REAL PROOF, BUT PROVING SIMULATED DATA)
 const tallyProof = await solvrn.api.proveTally(
   proposalId,
-  counts.yesVotes,  // ⚠️ Simulated!
-  counts.noVotes,   // ⚠️ Simulated!
+  counts.yesVotes,  // Simulated!
+  counts.noVotes,   // Simulated!
   51, 10
 );
-// Returns: Real ZK proof ✅
-// But proving: Simulated vote counts ⚠️
+// Returns: Real ZK proof
+// But proving: Simulated vote counts
 ```
 
-### ✅ Recommended: Provide Your Own Vote Counts
+### Recommended: Provide Your Own Vote Counts
 
 For production, decrypt votes yourself or wait for relayer decryption:
 
 ```typescript
 // Get accurate total vote count
 const counts = await solvrn.api.getVoteCounts(proposalId);
-console.log(`Total votes: ${counts.realVoteCount}`); // ✅ Accurate
+console.log(`Total votes: ${counts.realVoteCount}`); // Accurate
 
 // Provide your own yes/no breakdown (from your own decryption)
 const tallyProof = await solvrn.api.proveTally(
   proposalId,
-  yourDecryptedYesVotes,  // ✅ Your own decryption
-  yourDecryptedNoVotes,   // ✅ Your own decryption
+  yourDecryptedYesVotes,  // Your own decryption
+  yourDecryptedNoVotes,   // Your own decryption
   51, 10
 );
-// Returns: Real ZK proof of REAL data ✅
+// Returns: Real ZK proof of REAL data
 ```
 
 **What's Real:**
-- ✅ Total vote count (`realVoteCount`) - Accurate
-- ✅ ZK proof generation - 100% real
-- ✅ Vote encryption - 100% real
-- ✅ On-chain storage - 100% real
-- ✅ Tally proof generation - 100% real
+- Total vote count (`realVoteCount`) - Accurate
+- ZK proof generation - 100% real
+- Vote encryption - 100% real
+- On-chain storage - 100% real
+- Tally proof generation - 100% real
 
 **What's Simulated:**
-- ⚠️ Yes/No breakdown from `getVoteCounts()` - Until Arcium MPC decryption is implemented  
+- Yes/No breakdown from `getVoteCounts()` - Until Arcium MPC decryption is implemented  
 
 ## License
 
