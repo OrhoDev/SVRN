@@ -53,6 +53,7 @@ export default defineConfig({
   resolve: {
     alias: {
       pino: 'pino/browser.js',
+      'solvrn-sdk': 'solvrn-sdk/dist/index.js',
     },
   },
 });
