@@ -22,6 +22,7 @@ export default defineConfig({
   optimizeDeps: {
     // Exclude these so Vite doesn't try to bundle the WASM binaries
     exclude: ['@aztec/bb.js', '@noir-lang/noir_js', '@noir-lang/backend_barretenberg', 'solvrn-sdk'],
+    include: ['@solana/codecs-numbers'],
     esbuildOptions: {
       target: 'esnext',
     },
@@ -55,6 +56,6 @@ export default defineConfig({
       pino: 'pino/browser.js',
       'solvrn-sdk': 'solvrn-sdk/dist/index.js',
     },
-    conditions: ['import', 'module', 'default'],
+    conditions: ['import', 'module', 'browser', 'default'],
   },
 });

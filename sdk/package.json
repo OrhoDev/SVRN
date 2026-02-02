@@ -1,5 +1,5 @@
 {
-  "name": "svrn-sdk",
+  "name": "solvrn-sdk",
   "version": "1.0.0",
   "description": "Privacy SDK for Solana governance using zero-knowledge proofs and confidential computing",
   "type": "module",
@@ -28,10 +28,21 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./dist/index.js": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
