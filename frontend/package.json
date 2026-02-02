@@ -29,7 +29,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "shiki": "^3.21.0",
-    "solvrn-sdk": "../sdk",
+    "solvrn-sdk": "^1.0.0",
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
