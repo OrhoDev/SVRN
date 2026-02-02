@@ -3,7 +3,7 @@ services:
     name: solvrn-relayer
     runtime: node
     plan: free
-    buildCommand: "npm install"
+    buildCommand: "npm install && npm run build"
     startCommand: "npm start"
     envVars:
       - key: NODE_ENV
@@ -27,7 +27,7 @@ services:
     name: svrn-relayer-cron
     runtime: node
     plan: free
-    buildCommand: "npm install"
+    buildCommand: "npm install && npm run build"
     startCommand: "npm run cron"
     envVars:
       - key: NODE_ENV
