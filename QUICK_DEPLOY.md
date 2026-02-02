@@ -2,46 +2,63 @@
 
 ## 🚀 Step-by-Step Deployment
 
-### **PART 1: Deploy Relayer (Render.com)**
+### **PART 1: Deploy Relayer (Fly.io - 7 Day Free Trial)**
 
-#### 1. Create Render Account & Service
-- Go to https://render.com
-- Sign up/login
-- Click **"New +"** → **"Web Service"**
-- Connect your GitHub repository: `OrhoDev/SVRN`
-- Select the repository
+#### 1. Install Fly.io CLI
+```bash
+# macOS/Linux
+curl -L https://fly.io/install.sh | sh
 
-#### 2. Configure Build Settings
-- **Name**: `solvrn-relayer`
-- **Root Directory**: `relayer`
-- **Environment**: `Node`
-- **Build Command**: `npm install && npm run build`
-- **Start Command**: `npm start`
-- **Plan**: Free (or Starter for better performance)
+# Windows (PowerShell)
+iwr https://fly.io/install.ps1 -useb | iex
 
-#### 3. Set Environment Variables
-Click **"Environment"** tab and add:
-
+# Or download from: https://fly.io/docs/getting-started/installing-flyctl/
 ```
-NODE_ENV=production
-PORT=10000
-HELIUS_RPC_URL=https://devnet.helius-rpc.com/?api-key=33302b90-c418-4607-a96c-6483d6cb55db
-PROGRAM_ID=AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv
-ARCIUM_PROGRAM_ID=DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS
-ARCIUM_CLUSTER_OFFSET=456
-RELAYER_KEYPAIR=2iFJAMvuj7Kn38GkKv7Hu53sekpEVwTSabSQx342pmNcbrE5PdsdD4WEhm6Rh6SftL5uLVY4ssdXUj7bfLtaNZPk
+
+#### 2. Login to Fly.io
+```bash
+fly auth login
+# Follow the browser prompt to authenticate
+```
+
+#### 3. Create Fly.io App
+```bash
+cd relayer
+fly launch --no-deploy
+# When prompted:
+# - App name: solvrn-relayer (or choose your own)
+# - Region: iad (Washington, D.C.) or choose closest
+# - Don't deploy yet (we'll set env vars first)
+```
+
+#### 4. Set Environment Variables
+```bash
+fly secrets set NODE_ENV=production
+fly secrets set PORT=10000
+fly secrets set HELIUS_RPC_URL=https://devnet.helius-rpc.com/?api-key=33302b90-c418-4607-a96c-6483d6cb55db
+fly secrets set PROGRAM_ID=AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv
+fly secrets set ARCIUM_PROGRAM_ID=DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS
+fly secrets set ARCIUM_CLUSTER_OFFSET=456
+fly secrets set RELAYER_KEYPAIR=2iFJAMvuj7Kn38GkKv7Hu53sekpEVwTSabSQx342pmNcbrE5PdsdD4WEhm6Rh6SftL5uLVY4ssdXUj7bfLtaNZPk
 ```
 
 **⚠️ IMPORTANT**: Replace `HELIUS_RPC_URL` with your own Helius API key if you have one (get free key at https://helius.dev)
 
-#### 4. Deploy
-- Click **"Create Web Service"**
-- Wait for build to complete (~2-3 minutes)
-- Copy the URL (e.g., `https://solvrn-relayer.onrender.com`)
-
-#### 5. Verify Relayer
+#### 5. Deploy
 ```bash
-curl https://your-relayer-url.onrender.com/health
+fly deploy
+# Wait for build and deployment (~3-5 minutes)
+```
+
+#### 6. Get Your Relayer URL
+```bash
+fly status
+# Look for the URL, e.g., https://solvrn-relayer.fly.dev
+```
+
+#### 7. Verify Relayer
+```bash
+curl https://your-app-name.fly.dev/health
 # Should return: {"status":"ok","timestamp":"..."}
 ```
 
@@ -81,7 +98,7 @@ VITE_THRESHOLD_REQ=51
 VITE_QUORUM_REQ=10
 ```
 
-**⚠️ IMPORTANT**: Replace `VITE_RELAYER_URL` with your actual Render relayer URL!
+**⚠️ IMPORTANT**: Replace `VITE_RELAYER_URL` with your actual Fly.io relayer URL (e.g., `https://solvrn-relayer.fly.dev`)!
 
 #### 4. Deploy
 - Click **"Deploy"**
@@ -114,22 +131,30 @@ VITE_QUORUM_REQ=10
 ### Relayer Issues
 
 **"Relayer keypair not found"**
-- Double-check `RELAYER_KEYPAIR` env var is set correctly
+- Double-check `RELAYER_KEYPAIR` secret is set correctly: `fly secrets list`
 - Make sure there are no extra spaces or quotes
+- Set it again: `fly secrets set RELAYER_KEYPAIR=your-keypair-here`
 
 **"Insufficient funds"**
 - Fund the relayer wallet: `solana airdrop 1 AK3i9fk6t28qhq8UrmaWvAUDS2EcfC3566MSPZjnEv1L --url devnet`
 
 **"Connection refused"**
-- Verify `HELIUS_RPC_URL` is correct
-- Check Render logs for errors
+- Verify `HELIUS_RPC_URL` is correct: `fly secrets list`
+- Check Fly.io logs: `fly logs`
+- View app status: `fly status`
+
+**"Build failed"**
+- Check build logs: `fly logs --build`
+- Ensure Dockerfile is in the `relayer/` directory
+- Verify `package.json` has correct build scripts
 
 ### Frontend Issues
 
 **"Failed to fetch"**
-- Verify `VITE_RELAYER_URL` matches your Render URL exactly
+- Verify `VITE_RELAYER_URL` matches your Fly.io URL exactly (e.g., `https://solvrn-relayer.fly.dev`)
 - Check CORS settings (relayer should allow all origins in dev mode)
 - Check browser console for specific errors
+- Verify Fly.io app is running: `fly status`
 
 **"SDK initialization failed"**
 - Ensure HTTPS is enabled (Vercel provides this automatically)
