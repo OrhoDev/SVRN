@@ -3,19 +3,6 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": "vite",
-  "env": {
-    "VITE_RELAYER_URL": "@relayer-url",
-    "VITE_SOLANA_RPC_URL": "@solana-rpc-url",
-    "VITE_PROGRAM_ID": "@program-id",
-    "VITE_ARCIUM_PROGRAM_ID": "@arcium-program-id",
-    "VITE_THRESHOLD_REQ": "@threshold-req",
-    "VITE_QUORUM_REQ": "@quorum-req"
-  },
-  "functions": {
-    "src/api/*.ts": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "headers": [
     {
       "source": "/(.*)",
