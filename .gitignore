@@ -23,6 +23,7 @@ relayer/relayer-keypair.json
 *.pfx
 secrets/
 keys/
+keys/**/*.json
 *.secret
 *.private
 
