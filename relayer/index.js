@@ -108,6 +108,9 @@ catch (e) {
     console.warn("Arcium IDL not found - MPC decryption will be simulated");
 }
 const SNAPSHOT_DB = {};
+// Vote storage for trusted relayer tallying
+// Maps proposalId -> array of { voter, choice, weight }
+const VOTE_STORAGE = {};
 console.log("Solvrn Relayer Online");
 // --- ZK KERNEL ---
 let bb;
@@ -238,6 +241,7 @@ app.post('/initialize-snapshot', async (req, res) => {
             return res.status(503).json({ error: "ZK Backend initializing..." });
         // UPDATED: Now destructuring metadata and creator only
         const { votingMint, proposalId, metadata, creator } = req.body;
+        console.log(`[initialize-snapshot] Received: proposalId=${proposalId}, creator=${creator ? creator.slice(0, 8) + '...' : 'UNDEFINED'}`);
         const propKey = proposalId.toString();
         const response = await fetch(RPC_URL, {
             method: 'POST',
@@ -249,30 +253,39 @@ app.post('/initialize-snapshot', async (req, res) => {
         });
         const data = await response.json();
         const accounts = data.result?.token_accounts || [];
+        console.log(`[initialize-snapshot] RPC returned ${accounts.length} accounts`);
         let voters = accounts.map((acc) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v) => v.balance > 0).slice(0, 256);
-        // PRODUCTION MODE: Only add creator if they have tokens
+        console.log(`[initialize-snapshot] After filtering: ${voters.length} voters`);
+        // DEMO MODE: Add creator if not already in voters
         if (creator) {
+            console.log(`[initialize-snapshot] Creator provided: ${creator.slice(0, 8)}...`);
             const creatorInVoters = voters.find((v) => v.owner === creator);
             if (!creatorInVoters) {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... has no tokens. Not adding to voter list.`);
-                // In production mode, we DON'T force-add creators without tokens
-                // Uncomment the following lines for demo/testing mode:
-                /*
-                voters.unshift({
-                    owner: creator,
-                    balance: 1000000 // Default to 1 SOL for demo
-                });
-                console.log(`DEMO MODE: Force-added creator ${creator.slice(0,6)}... at beginning`);
-                */
+                // For demo: add creator with minimal balance
+                voters.unshift({ owner: creator, balance: 1000000 });
+                console.log(`[initialize-snapshot] DEMO MODE: Force-added creator. Total voters: ${voters.length}`);
             }
             else {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... already in voter list with ${creatorInVoters.balance} tokens`);
+                console.log(`[initialize-snapshot] Creator already in list`);
             }
         }
+        else {
+            console.log(`[initialize-snapshot] WARNING: No creator provided!`);
+        }
         // NOW build voterMap - creator is already in voters array
-        if (voters.length === 0)
-            throw new Error("No token holders found.");
+        // Safety check: if still empty and creator was provided, add it anyway
+        if (voters.length === 0) {
+            if (creator) {
+                console.log(`[initialize-snapshot] ERROR: Voters empty but creator provided. Adding creator anyway.`);
+                voters.unshift({ owner: creator, balance: 1000000 });
+            }
+            else {
+                console.log(`[initialize-snapshot] ERROR: No voters and no creator!`);
+                throw new Error("No token holders found and no creator provided.");
+            }
+        }
+        console.log(`[initialize-snapshot] Final voter count: ${voters.length}`);
         const leavesFr = [];
         const voterMap = {};
         console.log(`\n--- BUILDING QUADRATIC VOTING TREE (Prop #${propKey}) ---`);
@@ -451,15 +464,23 @@ app.post('/create-proposal', async (req, res) => {
         }
         const votingMintPubkey = new web3_js_1.PublicKey(votingMint);
         const targetWalletPubkey = targetWallet ? new web3_js_1.PublicKey(targetWallet) : relayerWallet.publicKey;
+        // Calculate associated token account for proposal
+        const [vault] = web3_js_1.PublicKey.findProgramAddressSync([
+            proposalPda.toBuffer(),
+            spl_token_1.TOKEN_PROGRAM_ID.toBuffer(),
+            votingMintPubkey.toBuffer()
+        ], spl_token_1.ASSOCIATED_TOKEN_PROGRAM_ID);
         console.log(`   Creating on-chain proposal...`);
         console.log(`   Authority (on-chain): ${relayerWallet.publicKey.toBase58().slice(0, 8)}... (relayer)`);
+        console.log(`   Proposal Token Account: ${vault.toBase58().slice(0, 8)}...`);
         const tx = await program.methods.initializeProposal(proposalBn, merkleRootBytes, new bn_js_1.BN(1000) // execution_amount
         ).accounts({
             proposal: proposalPda,
+            proposalTokenAccount: vault, // Associated token account
             votingMint: votingMintPubkey,
             treasuryMint: votingMintPubkey,
             targetWallet: targetWalletPubkey,
-            authority: relayerWallet.publicKey,
+            relayer: relayerWallet.publicKey, // Contract expects 'relayer' not 'authority'
             tokenProgram: spl_token_1.TOKEN_PROGRAM_ID,
             associatedTokenProgram: spl_token_1.ASSOCIATED_TOKEN_PROGRAM_ID,
             systemProgram: anchor.web3.SystemProgram.programId

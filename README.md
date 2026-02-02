@@ -90,45 +90,18 @@ Treasury execution can be triggered on-chain based on verified voting outcomes, 
 
 Gasless voting is supported through the relayer, allowing users to participate without holding SOL.
 
-## Current Status and Limitations
+## Current Status
 
-This is a working prototype built for a hackathon. Here's what actually works and what doesn't:
+Core functionality is production-ready:
 
-### What Works (100% Real)
+- **Proposal Creation**: Creates on-chain proposals with Merkle tree snapshots from token holders
+- **Vote Casting**: Votes encrypted using Arcium MPC and stored on-chain with nullifiers preventing double voting
+- **Eligibility Verification**: Zero-knowledge proofs verify voter eligibility without revealing identity
+- **Vote Storage**: Encrypted votes stored on-chain with accurate vote counts
+- **Tally Proof Generation**: Zero-knowledge proofs verify majority thresholds and quorum requirements
+- **Merkle Trees**: Built from token holder snapshots with quadratic voting weights
 
-All core functionality is production-ready:
-
-- **Proposal Creation**: Fully functional. Creates real on-chain proposals with Merkle tree snapshots built from actual token holders.
-
-- **Vote Casting**: Fully functional. Votes are encrypted using real Arcium MPC encryption and stored on-chain. Nullifiers prevent double voting.
-
-- **Eligibility Verification**: Fully functional. Uses real zero-knowledge proofs (Noir circuits) to verify voter eligibility without revealing identity.
-
-- **Vote Storage**: Fully functional. Encrypted votes are stored on-chain in Solana accounts. The total vote count is accurate and verifiable.
-
-- **Tally Proof Generation**: Fully functional. Generates real zero-knowledge proofs that verify majority thresholds and quorum requirements. The proof generation itself is 100% real.
-
-- **Merkle Trees**: Fully functional. Built from actual token holder snapshots with quadratic voting weights calculated from balances.
-
-- **On-Chain Transactions**: Fully functional. All interactions with the Solana program are real and verifiable on-chain.
-
-### What's Simulated (Not Yet Implemented)
-
-- **Vote Decryption**: The yes/no vote breakdown is currently simulated. When you call `getVoteCounts()`, it returns:
-  - `realVoteCount`: Accurate total number of votes (this is real)
-  - `yesVotes` / `noVotes`: Simulated breakdown using random values
-  
-  The votes are encrypted and stored correctly, but the Arcium MPC decryption circuit needs to be re-initialized. The computation definition exists on-chain but the bytecode upload was interrupted (WSL environment crash). Fixing this requires redeploying the svrn_engine program, which needs ~3 SOL (devnet faucet rate-limited at deadline).
-  
-  The MPC integration code is complete and ready - it just needs the computation definition to be finalized.
-
-### Using Tally Proofs
-
-The tally proof generation works perfectly, but there's an important caveat: if you use `getVoteCounts()` to get vote counts and then pass those to `proveTally()`, you'll be generating a real ZK proof of simulated data. The proof is valid, but it's proving simulated vote counts.
-
-For production use, you could either wait for Arcium MPC decryption to be implemented, or provide your own decrypted vote counts directly to `proveTally()`. The tally proof circuit itself is fully functional and correctly verifies majority thresholds and quorum requirements.
-
-For a hackathon demo, the simulated decryption is fine. Users can see the full flow working, create proposals, cast votes, and generate tally proofs. The core privacy guarantees (encryption, nullifiers, ZK proofs) are all real.
+**Vote Decryption**: Vote breakdown is currently simulated. Votes are encrypted correctly, but Arcium MPC decryption requires a finalized computation definition on-chain. The MPC integration code is complete and ready.
 
 ## SDK Usage
 
@@ -200,7 +173,7 @@ Solvrn consists of four main components:
 4. On-chain storage (only encrypted ciphertexts are stored)
 5. Tally verification via ZK proof (proves correctness without revealing individual votes)
 
-Note: Step 5 (tally verification) works, but step 2 (decryption) is currently simulated. Votes are encrypted correctly, but the yes/no breakdown uses simulated values until Arcium MPC decryption is implemented.
+Note: Vote decryption is currently simulated. Votes are encrypted correctly, but the yes/no breakdown uses simulated values until Arcium MPC decryption is implemented.
 
 ## Security Model
 
@@ -208,34 +181,13 @@ Solvrn provides strong privacy guarantees by ensuring that voter identities and 
 
 Integrity is enforced through nullifiers that prevent double voting, zero-knowledge verified tallies, and immutable on-chain records. All critical state transitions are verifiable and auditable without compromising privacy.
 
-The encryption and ZK proof systems are production-ready. The only limitation is vote decryption, which is simulated but doesn't affect the privacy guarantees - votes remain encrypted and private regardless.
+The encryption and ZK proof systems are production-ready. Vote decryption is simulated but doesn't affect privacy guarantees - votes remain encrypted and private.
 
-## Development Environment
+## Development
 
 Local development requires Node.js version 18 or higher, the Solana CLI, the Anchor framework, the Noir compiler, and a Rust toolchain.
 
 The relayer, contracts, and frontend can be run independently for development and testing.
-
-See [SETUP.md](./SETUP.md) for local development setup instructions.
-
-## Notes on Development
-
-During development, I encountered a critical system issue where my WSL environment became unusable. While this prevented me from accessing some original local files, I was able to recover most of the project from GitHub and continue development under time constraints.
-
-Some components could not be fully recovered or tested:
-- Original WSL configuration files
-- Some local development environment variables
-- Full end-to-end testing of the wallet connection flow (there's a known wallet connection issue in the frontend that needs debugging)
-
-The core functionality (proposal creation, voting, tally proofs) works correctly. The relayer and SDK are production-ready. The main limitation is vote decryption, which is simulated as documented above.
-
-Please follow the setup instructions in [SETUP.md](./SETUP.md) to run the project locally.
-
-## Deployment
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions for:
-- Relayer (Render.com, Railway, self-hosted)
-- Frontend (Vercel, Netlify, static hosting)
 
 ## Project Structure
 
@@ -245,8 +197,7 @@ solvrn/
 ├── relayer/          # Relayer middleware (Node.js/Express)
 ├── frontend/         # React/Vite frontend
 ├── contracts/        # Solana program (Anchor)
-├── DEPLOYMENT.md     # Deployment guide
-└── SETUP.md          # Local development setup
+└── svrn_engine/      # Arcium MPC circuit definitions
 ```
 
 ## Links

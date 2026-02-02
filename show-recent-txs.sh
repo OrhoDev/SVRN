@@ -1,0 +1,20 @@
+#!/bin/bash
+# Show recent transactions from relayer
+
+echo "=== RECENT TRANSACTIONS FROM RELAYER ==="
+echo ""
+echo "Relayer Wallet: 9rFkFKpUHuAAhDKB5k47RUvB3UfJw9vRMqY82LwKnQFP"
+echo "Program ID: 6zAAg4CUGjHeJMjLwWPgjTiAKtRtSqBTTjxcMnLo3vaJ"
+echo ""
+echo "Check Solana Explorer:"
+echo "  Relayer: https://explorer.solana.com/address/9rFkFKpUHuAAhDKB5k47RUvB3UfJw9vRMqY82LwKnQFP?cluster=devnet"
+echo "  Program: https://explorer.solana.com/address/6zAAg4CUGjHeJMjLwWPgjTiAKtRtSqBTTjxcMnLo3vaJ?cluster=devnet"
+echo ""
+echo "=== HOW TO FIND YOUR TRANSACTIONS ==="
+echo ""
+echo "1. Open the frontend in your browser"
+echo "2. Look at the 'Transaction History' section"
+echo "3. Each entry shows a transaction link"
+echo "4. Click the link to see it on Solana Explorer"
+echo ""
+echo "OR check the browser console for transaction signatures!"

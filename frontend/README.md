@@ -49,3 +49,4 @@ See [../DEPLOYMENT.md](../DEPLOYMENT.md) for deployment instructions.
 - Modern browser with WebAssembly support
 - HTTPS (required for WASM in production)
 
+

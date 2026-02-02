@@ -74,69 +74,20 @@ export class SolvrnClient {
              proposalId = nextId;
         }
 
-        // TEMPORARY: Revert to old working flow to fix voting
-        // TODO: Debug why /create-proposal causes merkle verification to fail
-        console.log("SDK: Creating proposal (temporary revert to old flow)");
-        
-        // --- UPDATED: Pass Authority Pubkey ---
-        const snap = await this.api.initializeSnapshot(
-            proposalId, 
-            votingMint, 
+        // Use relayer's /create-proposal endpoint (relayer signs and pays)
+        const result = await this.api.createProposal(
+            proposalId,
+            votingMint,
             metadata,
-            authorityPubkey.toBase58() // <--- Force Creator into Snapshot
+            authorityPubkey.toBase58(),
+            authorityPubkey.toBase58() // targetWallet
         );
         
-        if (!snap.success) throw new Error(snap.error || "Snapshot failed.");
+        if (!result.success) {
+            throw new Error(result.error || "Proposal creation failed");
+        }
 
-        // 2. Build On-Chain TX (old way - creator signs)
-        const program = new Program(idl as any, provider) as any;
-        console.log("SDK CALLING PROGRAM ID:", program.programId.toBase58());
-        
-        // PROPOSAL PDA (Synced Seed: svrn_v5)
-        const [pda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("svrn_v5"), new BN(proposalId).toArrayLike(Buffer, "le", 8)], 
-            getProgramId()
-        );
-        
-        // VAULT PDA (Strict Legacy)
-        const [vault] = PublicKey.findProgramAddressSync(
-            [
-                pda.toBuffer(), 
-                TOKEN_PROGRAM_ID.toBuffer(), // Legacy
-                new PublicKey(votingMint).toBuffer()
-            ], 
-            ASSOCIATED_TOKEN_PROGRAM_ID
-        );
-        
-        const tx = await (program.methods as any).initializeProposal(new BN(proposalId), hexToBytes(snap.root), new BN(1000))
-            .accounts({ 
-                proposal: pda, 
-                proposalTokenAccount: vault, 
-                authority: authorityPubkey, 
-                votingMint: new PublicKey(votingMint), 
-                treasuryMint: new PublicKey(votingMint),
-                targetWallet: authorityPubkey,
-                tokenProgram: TOKEN_PROGRAM_ID, // Strict Legacy
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,  
-                systemProgram: SystemProgram.programId 
-            })
-            .transaction();
-        
-        tx.add(SystemProgram.transfer({
-            fromPubkey: authorityPubkey,
-            toPubkey: pda,
-            lamports: gasBufferSol * LAMPORTS_PER_SOL
-        }));
-
-        const { blockhash } = await provider.connection.getLatestBlockhash();
-        tx.recentBlockhash = blockhash;
-        tx.feePayer = authorityPubkey;
-
-        const signedTx = await provider.wallet.signTransaction(tx);
-        const txid = await provider.connection.sendRawTransaction(signedTx.serialize());
-        await provider.connection.confirmTransaction(txid);
-
-        return { proposalId, txid };
+        return { proposalId, txid: result.tx };
     }
 
     public async castVote(

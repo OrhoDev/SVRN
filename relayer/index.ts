@@ -237,6 +237,7 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
         
         // UPDATED: Now destructuring metadata and creator only
         const { votingMint, proposalId, metadata, creator } = req.body;
+        console.log(`[initialize-snapshot] Received: proposalId=${proposalId}, creator=${creator ? creator.slice(0,8) + '...' : 'UNDEFINED'}`);
         const propKey = proposalId.toString(); 
 
         const response = await fetch(RPC_URL, {
@@ -250,30 +251,38 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
 
         const data: any = await response.json();
         const accounts = data.result?.token_accounts || [];
+        console.log(`[initialize-snapshot] RPC returned ${accounts.length} accounts`);
         let voters = accounts.map((acc: any) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v: any) => v.balance > 0).slice(0, 256);
+        console.log(`[initialize-snapshot] After filtering: ${voters.length} voters`);
 
-        // PRODUCTION MODE: Only add creator if they have tokens
+        // DEMO MODE: Add creator if not already in voters
         if (creator) {
+            console.log(`[initialize-snapshot] Creator provided: ${creator.slice(0,8)}...`);
             const creatorInVoters = voters.find((v: any) => v.owner === creator);
             if (!creatorInVoters) {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0,6)}... has no tokens. Not adding to voter list.`);
-                // In production mode, we DON'T force-add creators without tokens
-                // Uncomment the following lines for demo/testing mode:
-                /*
-                voters.unshift({
-                    owner: creator,
-                    balance: 1000000 // Default to 1 SOL for demo
-                });
-                console.log(`DEMO MODE: Force-added creator ${creator.slice(0,6)}... at beginning`);
-                */
+                // For demo: add creator with minimal balance
+                voters.unshift({ owner: creator, balance: 1000000 });
+                console.log(`[initialize-snapshot] DEMO MODE: Force-added creator. Total voters: ${voters.length}`);
             } else {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0,6)}... already in voter list with ${creatorInVoters.balance} tokens`);
+                console.log(`[initialize-snapshot] Creator already in list`);
             }
+        } else {
+            console.log(`[initialize-snapshot] WARNING: No creator provided!`);
         }
 
         // NOW build voterMap - creator is already in voters array
-        if (voters.length === 0) throw new Error("No token holders found.");
+        // Safety check: if still empty and creator was provided, add it anyway
+        if (voters.length === 0) {
+            if (creator) {
+                console.log(`[initialize-snapshot] ERROR: Voters empty but creator provided. Adding creator anyway.`);
+                voters.unshift({ owner: creator, balance: 1000000 });
+            } else {
+                console.log(`[initialize-snapshot] ERROR: No voters and no creator!`);
+                throw new Error("No token holders found and no creator provided.");
+            }
+        }
+        console.log(`[initialize-snapshot] Final voter count: ${voters.length}`);
 
         const leavesFr: Fr[] = []; 
         const voterMap: Record<string, any> = {};
@@ -485,8 +494,19 @@ app.post('/create-proposal', async (req: Request, res: Response) => {
         const votingMintPubkey = new PublicKey(votingMint);
         const targetWalletPubkey = targetWallet ? new PublicKey(targetWallet) : relayerWallet.publicKey;
 
+        // Calculate associated token account for proposal
+        const [vault] = PublicKey.findProgramAddressSync(
+            [
+                proposalPda.toBuffer(), 
+                TOKEN_PROGRAM_ID.toBuffer(),
+                votingMintPubkey.toBuffer()
+            ], 
+            ASSOCIATED_TOKEN_PROGRAM_ID
+        );
+
         console.log(`   Creating on-chain proposal...`);
         console.log(`   Authority (on-chain): ${relayerWallet.publicKey.toBase58().slice(0, 8)}... (relayer)`);
+        console.log(`   Proposal Token Account: ${vault.toBase58().slice(0, 8)}...`);
 
         const tx = await program.methods.initializeProposal(
             proposalBn,
@@ -494,10 +514,11 @@ app.post('/create-proposal', async (req: Request, res: Response) => {
             new BN(1000) // execution_amount
         ).accounts({
             proposal: proposalPda,
+            proposalTokenAccount: vault, // Associated token account
             votingMint: votingMintPubkey,
             treasuryMint: votingMintPubkey,
             targetWallet: targetWalletPubkey,
-            authority: relayerWallet.publicKey,
+            relayer: relayerWallet.publicKey, // Contract expects 'relayer' not 'authority'
             tokenProgram: TOKEN_PROGRAM_ID,
             associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
             systemProgram: anchor.web3.SystemProgram.programId

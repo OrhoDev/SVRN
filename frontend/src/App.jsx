@@ -4,33 +4,24 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
-// --- DEBUGGING ---
-// console.log('Wallet adapters loaded:', { PhantomWalletAdapter, WalletMultiButton });
 import { AnchorProvider, Program } from '@coral-xyz/anchor';
 import BN from 'bn.js';
 import { PublicKey, clusterApiUrl, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 import idl from './idl.json';
 
-// --- SDK IMPORT ---
 import { SolvrnClient } from 'solvrn-sdk';
 import circuit from '../circuit/target/circuit.json';
-
-// --- ASSETS & STYLES ---
 import '@solana/wallet-adapter-react-ui/styles.css';
 import './index.css';
 import { 
     Terminal, ArrowRight, Shield, Lock, 
     Database, Globe, Layers, ExternalLink, 
-    FileCode, Github, Moon, Sun, CheckCircle, Copy, GitBranch // <-- Ensure GitBranch is here
+    FileCode, Github, Moon, Sun, CheckCircle, Copy, GitBranch
 } from 'lucide-react';
-
-// --- CONSTANTS ---
 const PROGRAM_ID = new PublicKey(import.meta.env.VITE_PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
-const THRESHOLD_REQ = parseInt(import.meta.env.VITE_THRESHOLD_REQ) || 51; // 51% threshold for proposal approval
-const QUORUM_REQ = parseInt(import.meta.env.VITE_QUORUM_REQ) || 10;   // Minimum 10 votes required for validity
-
-// --- COMPONENTS ---
+const THRESHOLD_REQ = parseInt(import.meta.env.VITE_THRESHOLD_REQ) || 51;
+const QUORUM_REQ = parseInt(import.meta.env.VITE_QUORUM_REQ) || 10;
 
 const CopyButton = ({ text }) => {
     const [copied, setCopied] = useState(false);
@@ -46,9 +37,7 @@ const CopyButton = ({ text }) => {
     );
 };
 
-// Clean syntax highlighter for IDE-style execution
 const SyntaxHighlight = ({ code }) => {
-    // Simple tokenization for VS Code Dark+ theme
     const parts = code.split(/(\b(?:const|await|import|from|return|function|if|else|new|async)\b|\/\/.*|"[^"]*"|'[^']*'|`[^`]*`|\d+|[{}()[\].;,]|[A-Z][a-zA-Z0-9_]*\b|[a-z][a-zA-Z0-9_]*(?=\())\b/g);
     
     return (
@@ -56,37 +45,29 @@ const SyntaxHighlight = ({ code }) => {
             {parts.map((part, i) => {
                 if (!part) return null;
                 
-                // Keywords - blue
                 if (/^(const|await|import|from|return|function|if|else|new|async)$/.test(part)) 
                     return <span key={i} className="text-[#569cd6]">{part}</span>;
                 
-                // Comments - green
                 if (part.startsWith('//')) 
                     return <span key={i} className="text-[#6a9955] italic">{part}</span>;
                 
-                // Strings - orange
                 if (part.startsWith('"') || part.startsWith("'") || part.startsWith('`')) 
                     return <span key={i} className="text-[#ce9178]">{part}</span>;
                 
-                // Numbers - light green
                 if (/^\d+$/.test(part)) 
                     return <span key={i} className="text-[#b5cea8]">{part}</span>;
                 
-                // Types - cyan
                 if (/^[A-Z][a-zA-Z0-9_]*$/.test(part))
                     return <span key={i} className="text-[#4ec9b0]">{part}</span>;
                 
-                // Functions - yellow
                 if (/^[a-z][a-zA-Z0-9_]*$/.test(part) && parts[i+1] && parts[i+1].startsWith('('))
                     return <span key={i} className="text-[#dcdcaa]">{part}</span>;
                 
-                // Default - light gray
                 return <span key={i} className="text-[#d4d4d4]">{part}</span>;
             })}
         </span>
     );
 };
-// IDE execution step with integrated explanation
 const IDEEntry = ({ entry, lineStart }) => {
     const lines = entry.code.split('\n');
     
@@ -166,7 +147,6 @@ const StatsTicker = () => (
     </div>
 );
 
-// --- DYNAMIC WALLET BUTTON ---
 const StyledWalletButton = () => {
     const { wallet, connect, connecting, connected, disconnect } = useWallet();
     const adapterName = wallet?.adapter?.name || '';
@@ -174,10 +154,7 @@ const StyledWalletButton = () => {
     // Auto-connect when wallet is selected but not connected
     useEffect(() => {
         if (wallet && !connected && !connecting) {
-            connect().catch((err) => {
-                // Error is already handled by onError in WalletProvider
-                console.log('Auto-connect attempt:', err);
-            });
+            connect().catch(() => {});
         }
     }, [wallet, connected, connecting, connect]);
     
@@ -192,7 +169,6 @@ const StyledWalletButton = () => {
     );
 };
 
-// CLEANED UP TOKEN LIST
 const SUPPORTED_TOKENS = [
     { name: "SOL (Wrapped)", address: "So11111111111111111111111111111111111111112" }
 ];
@@ -202,7 +178,6 @@ const Dashboard = () => {
     const { publicKey } = useWallet(); 
     const anchorWallet = useAnchorWallet();
 
-    // --- STATE ---
     const [proposalId, setProposalId] = useState(null);
     const [nextIdDisplay, setNextIdDisplay] = useState("...");
     const [isSnapshotReady, setIsSnapshotReady] = useState(false);
@@ -215,9 +190,7 @@ const Dashboard = () => {
     const [propDesc, setPropDesc] = useState("Allocate 5000 USDC to the SVRN Labs team for ZK-circuit optimizations.");
     const [duration, setDuration] = useState(24);
     
-    // SDK State
     const svrn = useMemo(() => {
-        console.log('Creating SolvrnClient with PROGRAM_ID:', import.meta.env.VITE_PROGRAM_ID);
         return new SolvrnClient(
             import.meta.env.VITE_RELAYER_URL || "http://localhost:3000",
             import.meta.env.VITE_ARCIUM_PROGRAM_ID,
@@ -230,45 +203,24 @@ const Dashboard = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [myVoteWeight, setMyVoteWeight] = useState(0);
     const [hasVoted, setHasVoted] = useState(false);
-
-    // Playground Logs
     const [history, setHistory] = useState([]);
     const terminalRef = useRef(null);
-
-    // --- SCROLL EFFECT ---
     useEffect(() => {
         const handleScroll = () => setScrollY(window.scrollY);
         window.addEventListener("scroll", handleScroll);
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    // --- CONNECTIVITY & INIT ---
     useEffect(() => {
         if (!publicKey) return;
-        // Silent diagnostic check
-        connection.getAccountInfo(PROGRAM_ID).catch(e => console.error("Network Error", e));
+        connection.getAccountInfo(PROGRAM_ID).catch(() => {});
     }, [publicKey, connection]);
 
-    // Initial SDK Init
     useEffect(() => {
-        console.log("Initializing SVRN SDK...");
-        
-        // Add timeout to detect hanging
-        const timeout = setTimeout(() => {
-            console.error("SVRN SDK initialization timed out after 10 seconds");
-            setHistory([{
-                title: "INITIALIZATION TIMEOUT",
-                api: "SVRN SDK",
-                code: `// SDK initialization timed out
-await svrn.init(circuit);
-// This usually indicates a WASM loading issue`,
-                result: "SDK initialization timed out (WASM loading issue)"
-            }]);
-        }, 10000);
+        const timeout = setTimeout(() => {}, 30000);
         
         svrn.init(circuit).then(() => {
             clearTimeout(timeout);
-            console.log("SVRN SDK initialized successfully");
             setZkReady(true);
             setHistory([{
                 title: "INITIALIZATION",
@@ -281,14 +233,14 @@ await svrn.init(circuit);
             }]);
             setNextIdDisplay("AUTO");
         }).catch(e => {
-            console.error("❌ SVRN SDK initialization failed:", e);
+            clearTimeout(timeout);
             setHistory([{
                 title: "INITIALIZATION ERROR",
                 api: "SVRN SDK",
                 code: `// Failed to initialize SVRN Middleware
 await svrn.init(circuit);
 // Error: ${e.message}`,
-                result: "❌ SDK initialization failed"
+                result: "SDK initialization failed"
             }]);
         });
     }, [svrn]);
@@ -299,7 +251,6 @@ await svrn.init(circuit);
         }
     }, [history]);
 
-    // Live Count Polling
     useEffect(() => {
         if (!publicKey || !proposalId) return;
         const fetchCount = async () => {
@@ -319,18 +270,12 @@ await svrn.init(circuit);
         setHistory(prev => [...prev, { title, api, code, result, tx }]);
     };
 
-    // --- LOGIC HANDLERS ---
-    
-    // 1. CREATE PROPOSAL
     const handleCreate = async () => {
         if (isLoading || !publicKey) return;
         setIsLoading(true);
 
         try {
-            // Get next proposal ID from relayer
-            console.log("Getting next proposal ID from relayer...");
             const nextIdResponse = await svrn.api.getNextProposalId();
-            console.log("Next proposal ID response:", nextIdResponse);
             let nextProposalId = nextIdResponse.nextId; 
             
             while (true) {
@@ -339,7 +284,7 @@ await svrn.init(circuit);
                     PROGRAM_ID
                 );
                 const info = await connection.getAccountInfo(pda);
-                if (!info) break; // Found free ID
+                if (!info) break;
                 nextProposalId++;
             }
 
@@ -352,7 +297,7 @@ await svrn.init(circuit);
 const { proposalId, txid } = await svrn.createProposal(
     provider,           // Solana wallet connection
     publicKey,         // Your wallet's public key
-    "${votingMintStr.slice(0,8)}...",  // Voting token (USDC, SOL, etc.)
+    "${votingMintStr.slice(0,8)}...",  // Voting token (truncated)
     { 
         title: "${propTitle}", 
         desc: "${propDesc.slice(0, 30)}...",
@@ -379,16 +324,11 @@ const { proposalId, txid } = await svrn.createProposal(
                 nextProposalId
             );
 
-            // DEMO MODE: Add creator to voting tree if they don't have tokens
-            console.log("DEMO: Checking if creator needs to be added to voting tree...");
             try {
                 const proposal = await svrn.api.getProposal(nextProposalId);
                 if (proposal.success && proposal.proposal.voterMap) {
                     const creatorInVoters = proposal.proposal.voterMap[publicKey.toBase58()];
                     if (!creatorInVoters) {
-                        console.log("DEMO: Creator not in voting tree - adding them manually...");
-                        
-                        // Call demo endpoint to add creator to voting tree
                         const response = await fetch(`${import.meta.env.VITE_RELAYER_URL || "http://localhost:3000"}/demo-add-creator`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -398,40 +338,24 @@ const { proposalId, txid } = await svrn.createProposal(
                             })
                         });
                         
-                        const result = await response.json();
-                        if (result.success) {
-                    console.log("DEMO: Successfully added creator to voting tree");
-                        } else {
-                            console.log("DEMO: Failed to add creator to voting tree:", result.error);
-                        }
-                    } else {
-                        console.log("DEMO: Creator already in voting tree");
+                        await response.json();
                     }
                 }
-            } catch (e) {
-                console.log("DEMO: Could not check voter map:", e);
-            }
+            } catch (e) {}
 
             setProposalId(nextProposalId);
             
-            // Verify proposal exists in relayer before enabling voting
             try {
-                console.log("Verifying proposal exists in relayer:", nextProposalId);
                 const proposal = await svrn.api.getProposal(nextProposalId);
-                console.log("Proposal response:", proposal);
                 if (proposal.success) {
-                    console.log("Proposal found in relayer, enabling voting");
                     setIsSnapshotReady(true);
                 } else {
-                    console.log("Proposal not found in relayer");
                     setIsSnapshotReady(false);
                 }
             } catch (e) {
-                console.error('Failed to fetch proposal from relayer:', e);
                 setIsSnapshotReady(false);
             }
 
-            // Update the last entry with result
             setHistory(prev => {
                 const newH = [...prev];
                 newH[newH.length-1].result = `Proposal created! Voter snapshot built and proposal is active on-chain.`;
@@ -440,14 +364,12 @@ const { proposalId, txid } = await svrn.createProposal(
             });
 
         } catch (e) {
-            console.error(e);
             addEntry("Error", "Failed", `// Error during initialization\nthrow new Error("${e.message}");`, "Transaction Aborted");
         } finally {
             setIsLoading(false);
         }
     };
 
-    // 2. CAST VOTE
     const handleVote = async (choice) => {
         if (isLoading || !zkReady || !publicKey || !proposalId) return; 
         setIsLoading(true);
@@ -456,7 +378,7 @@ const { proposalId, txid } = await svrn.createProposal(
 `// Cast a vote - SDK handles all privacy automatically
 const result = await svrn.castVote(
     provider,           // Solana wallet connection
-    publicKey.toBase58(),  // Your wallet address
+    publicKey.toBase58(),  // Wallet address
     proposalId,         // Proposal ID
     choice              // 0 = NO, 1 = YES
 );
@@ -485,7 +407,6 @@ const result = await svrn.castVote(
             setHasVoted(true);
 
         } catch (e) { 
-            // SPECIAL FEATURE SHOWCASE: DOUBLE VOTING
             if (e.message.includes("Allocate: account Address") || e.message.includes("0x0")) {
                 addEntry("Security: Double-voting prevented while keeping identity private", "Security Protocol", 
 `// Each vote creates a unique "nullifier" hash
@@ -500,14 +421,12 @@ if (nullifierExists(userNullifier)) {
 // - Identity stays anonymous
 // - Uniqueness verified without revealing who you are`, "Security check passed: Double-voting prevented, privacy preserved");
             } else {
-                console.error(e);
                 alert("Vote Failed: " + e.message); 
             }
         } 
         finally { setIsLoading(false); }
     };
 
-    // 3. TALLY
     const handleTally = async () => {
         if (isLoading || !proposalId) return;
 
@@ -518,18 +437,16 @@ const voteCounts = await svrn.api.getVoteCounts(proposalId);
 
 // Generate ZK proof that verifies:
 // - Vote counts are accurate
-// - Threshold met (${THRESHOLD_REQ}% majority)
-// - Quorum met (at least ${QUORUM_REQ} votes)
+// - Threshold requirements met
 const tallyProof = await svrn.api.proveTally(
     proposalId,           // Proposal to tally
     voteCounts.yesVotes,  // YES votes
     voteCounts.noVotes,   // NO votes
-    ${THRESHOLD_REQ},     // Min % to pass (e.g., 51%)
-    ${QUORUM_REQ}         // Min total votes (e.g., 10)
+    ${THRESHOLD_REQ},     // Min % to pass
+    ${QUORUM_REQ}         // Min total votes
 );
 
-// Proof verifies results while keeping all votes private
-console.log('Tally verified:', tallyProof.success);`, "Generating verifiable tally proof...");
+// Proof verifies results while keeping all votes private`, "Generating verifiable tally proof...");
 
     try {
         // First get the actual vote counts
@@ -557,13 +474,10 @@ console.log('Tally verified:', tallyProof.success);`, "Generating verifiable tal
         setHistory(prev => {
             const newH = [...prev];
             let resultMsg = `Tally complete! Results verified with ZK proof. `;
-            resultMsg += `${yesVotes} YES, ${noVotes} NO. `;
             if (thresholdMet && quorumMet) {
-                resultMsg += `Proposal PASSED (${Math.round((yesVotes / totalVotes) * 100)}% majority).`;
+                resultMsg += `Proposal PASSED.`;
             } else if (!thresholdMet && totalVotes > 0) {
-                resultMsg += `Proposal did not pass (needed ${THRESHOLD_REQ}% majority).`;
-            } else if (!quorumMet) {
-                resultMsg += `Proposal did not pass (quorum not met).`;
+                resultMsg += `Proposal did not pass.`;
             } else {
                 resultMsg += `Results verified.`;
             }
@@ -607,9 +521,9 @@ console.log('Tally verified:', tallyProof.success);`, "Generating verifiable tal
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
                         <span className="text-xl font-black tracking-tighter flex items-center gap-2 uppercase">
-                            <Shield size={22} className="fill-current"/> SVRN
+                            SOLVRN
                         </span>
-                        <span className="text-[10px] text-[var(--bg-card)] bg-[var(--text-main)] px-2 py-0.5 font-bold uppercase tracking-wider hidden sm:inline-block">SDK</span>
+                      
                     </div>
                     <button onClick={() => setDarkMode(!darkMode)} className="p-1 hover:bg-[var(--bg-subtle)] rounded transition-colors">
                         {darkMode ? <Sun size={16} /> : <Moon size={16} />}
@@ -626,7 +540,7 @@ console.log('Tally verified:', tallyProof.success);`, "Generating verifiable tal
                 </div>
             </nav>
 
-            {/* --- HERO (WITH SCROLL EFFECT) --- */}
+            {/* --- HERO --- */}
             <section className="py-24 px-6 text-center max-w-6xl mx-auto relative overflow-hidden"
                 style={{ 
                     opacity: 1 - scrollY / 600, 
@@ -1053,58 +967,11 @@ export default function App() {
             <WalletProvider 
                 wallets={wallets} 
                 autoConnect={false}
-                onError={(error, adapter) => {
-                    // Get detailed error info
+                onError={(error) => {
                     const errorMsg = error?.message || error?.toString() || '';
-                    const errorName = error?.name || '';
-                    const adapterName = adapter?.name || 'unknown';
-                    
-                    // Ignore MetaMask/Ethereum-related errors (these are expected)
-                    if (errorMsg.includes('MetaMask') || 
-                        errorMsg.includes('ethereum') || 
-                        errorMsg.includes('Ethereum') ||
-                        errorMsg.includes('Failed to connect to MetaMask') ||
-                        errorMsg.includes('MetaMask extension not found')) {
+                    if (errorMsg.includes('MetaMask') || errorMsg.includes('ethereum') || errorMsg.includes('Ethereum')) {
                         return;
                     }
-                    
-                    // Check if wallet is actually available
-                    const walletAvailable = typeof window !== 'undefined' && 
-                        ((adapterName === 'Phantom' && window.solana?.isPhantom) ||
-                         (adapterName === 'Solflare' && window.solflare));
-                    
-                    // Extract underlying error from Phantom if available
-                    const underlyingError = error?.error || error?.cause || error;
-                    const underlyingMsg = underlyingError?.message || underlyingError?.toString() || '';
-                    
-                    // Log detailed Solana wallet errors for debugging
-                    console.error('Solana wallet connection error:', {
-                        name: errorName,
-                        message: errorMsg,
-                        adapter: adapterName,
-                        walletAvailable: walletAvailable,
-                        windowSolana: typeof window !== 'undefined' ? !!window.solana : false,
-                        windowSolflare: typeof window !== 'undefined' ? !!window.solflare : false,
-                        underlyingError: underlyingMsg,
-                        stack: error?.stack,
-                        cause: error?.cause,
-                        fullError: error
-                    });
-                    
-                    // Provide user-friendly error message for Phantom connection failures
-                    if (adapterName === 'Phantom' && walletAvailable && errorMsg === 'Unexpected error') {
-                        console.warn('⚠️ Phantom wallet detected but connection failed.');
-                        console.warn('Common causes:');
-                        console.warn('1. Wallet is locked - unlock Phantom wallet');
-                        console.warn('2. Network mismatch - ensure Phantom is on Devnet (Settings > Developer Mode > Change Network)');
-                        console.warn('3. Site authorization - check if Phantom popup appeared');
-                        console.warn('4. Try disconnecting and reconnecting');
-                        if (underlyingMsg) {
-                            console.warn('Underlying error:', underlyingMsg);
-                        }
-                    }
-                    
-                    // Don't throw - let the wallet adapter handle it
                 }}
             >
                 <WalletModalProvider>

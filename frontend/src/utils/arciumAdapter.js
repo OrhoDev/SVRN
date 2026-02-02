@@ -7,9 +7,6 @@ const ARCIUM_MXE_ID = new PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JT
 
 export const encryptVote = async (provider, voteChoice, realBalance) => {
   try {
-    console.log("Arcium: Fetching Key...");
-    console.log("   Program ID:", ARCIUM_MXE_ID.toString());
-    
     // Retry logic for MXE key (keygen might still be in progress)
     // The MXE account exists, but the public key isn't available until keygen completes
     // Keygen can take 2-5 minutes after initialization, so we retry for up to 6 minutes
@@ -22,25 +19,12 @@ export const encryptVote = async (provider, voteChoice, realBalance) => {
       try {
         mxePublicKey = await getMXEPublicKey(provider, ARCIUM_MXE_ID);
         if (mxePublicKey) {
-          console.log("MXE Public Key retrieved!");
           break;
         }
       } catch (err) {
-        if (attempts % 10 === 0 || attempts < 5) {
-          // Log every 10th attempt or first 5 attempts
-          console.log(`   Attempt ${attempts + 1}/${maxAttempts} failed:`, err.message);
-          if (attempts === 0) {
-            console.log(`   Keygen in progress... This can take 2-5 minutes.`);
-            console.log(`   Tip: You can check status with: cd svrn_engine && yarn run check-keygen`);
-          }
-        }
+        // Silent retry
       }
       if (!mxePublicKey && attempts < maxAttempts - 1) {
-        if (attempts % 10 === 0) {
-          // Show progress every 10 attempts (every 30 seconds)
-          const minutesElapsed = Math.floor((attempts * retryDelayMs) / 60000);
-          console.log(`   Still waiting... (${minutesElapsed} min elapsed, ${attempts + 1}/${maxAttempts} attempts)`);
-        }
         await new Promise(resolve => setTimeout(resolve, retryDelayMs));
       }
       attempts++;
@@ -74,7 +58,6 @@ export const encryptVote = async (provider, voteChoice, realBalance) => {
       public_key: Array.from(ephemeralPublic) 
     };
   } catch (err) {
-    console.error(err);
     throw err;
   }
 };

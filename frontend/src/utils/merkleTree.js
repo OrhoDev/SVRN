@@ -23,7 +23,6 @@ function toBuffer32(val) {
             else bigVal = BigInt(val);
         } else {
             // If it's already a buffer or unknown, default to 0 to prevent crash
-            console.warn("Invalid input to toBuffer32:", val);
             return Buffer.alloc(32).fill(0);
         }
 
@@ -32,7 +31,6 @@ function toBuffer32(val) {
         // Slice last 64 chars to handle potential overflows gracefully
         return Buffer.from(padded.slice(-64), 'hex');
     } catch (e) {
-        console.error("Buffer conversion error:", e);
         return Buffer.alloc(32).fill(0);
     }
 }
@@ -42,13 +40,8 @@ function toBuffer32(val) {
  */
 export async function pedersenHash(input1, input2) {
     const bb = await getBarretenberg();
-    
-    // ⚠️ THE FIX: Explicitly convert to Buffers before passing to BB
     const buf1 = toBuffer32(input1);
     const buf2 = toBuffer32(input2);
-    
-    // Debug log to catch "0" balance issues
-    // console.log("Hashing:", buf1.toString('hex'), buf2.toString('hex'));
 
     const result = await bb.pedersenHash({
         inputs: [buf1, buf2],

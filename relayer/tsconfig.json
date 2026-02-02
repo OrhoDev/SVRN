@@ -4,6 +4,10 @@
       "module": "commonjs",
       "strict": true,
       "esModuleInterop": true,
-      "skipLibCheck": true
-    }
+      "skipLibCheck": true,
+      "outDir": "./",
+      "rootDir": "./"
+    },
+    "include": ["*.ts"],
+    "exclude": ["node_modules"]
   }

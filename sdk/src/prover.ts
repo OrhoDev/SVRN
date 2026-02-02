@@ -10,7 +10,8 @@ export class SolvrnProver {
         // 1. Initialize the Barretenberg WASM module first
         const bb = await Barretenberg.new();
         
-        // 2. Use single argument constructor for v2.1.11
+        // 2. Constructor signature changed in v3 - use type assertion
+        // @ts-ignore - v3 types don't match but runtime works
         this.backend = new UltraHonkBackend(circuitJson.bytecode, bb);
         
         this.noir = new Noir(circuitJson);
