@@ -2,7 +2,7 @@
  * Test snapshot building with actual ZK backend
  */
 
-import { SolvrnClient, SnapshotBuilder } from './sdk/dist/index.js';
+import { SolvrnClient, SnapshotBuilder } from '../sdk/dist/index.js';
 import { Barretenberg } from '@aztec/bb.js';
 import fs from 'fs';
 import path from 'path';
@@ -114,7 +114,7 @@ async function main() {
 
     // Test serialization
     console.log('8. Testing snapshot serialization...');
-    const { serializeSnapshot, deserializeSnapshot } = await import('./sdk/dist/index.js');
+    const { serializeSnapshot, deserializeSnapshot } = await import('../sdk/dist/index.js');
     const serialized = serializeSnapshot(snapshot);
     const deserialized = deserializeSnapshot(serialized);
     

@@ -6,7 +6,7 @@
  * - IPFS snapshot distribution
  */
 
-import { SolvrnClient } from './sdk/dist/index.js';
+import { SolvrnClient } from '../sdk/dist/index.js';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
@@ -132,7 +132,7 @@ async function main() {
     console.log('4. Testing message signing (gasless voting)...');
     try {
         // Create a test vote message
-        const { createVoteMessage, signVoteMessage, verifySignedVote } = await import('./sdk/dist/index.js');
+        const { createVoteMessage, signVoteMessage, verifySignedVote } = await import('../sdk/dist/index.js');
         
         const testMessage = createVoteMessage(
             1, // proposalId

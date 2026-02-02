@@ -5,6 +5,10 @@ export default defineConfig({
   format: ['esm'],
   dts: true,
   clean: true,
+  // Include JSON files in the bundle
+  loader: {
+    '.json': 'json'
+  },
   external: [
     '@aztec/bb.js',
     '@noir-lang/noir_js',

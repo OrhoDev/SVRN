@@ -1,4 +1,4 @@
-import { SolvrnApi, ProposalMetadata } from './api.js';
+import { SolvrnApi, ProposalMetadata, ProposalSummary, EligibleProposal } from './api.js';
 import { SolvrnProver } from './prover.js';
 import { SolvrnEncryption } from './encryption.js';
 import { AnchorProvider, Program } from '@coral-xyz/anchor';
@@ -6,6 +6,18 @@ import BN from 'bn.js';
 import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import idl from './idl.json' with { type: 'json' };
 import { hexToBytes } from './utils.js';
+
+// Bundled circuit for convenience (users don't need to provide it)
+import circuitJson from './circuit.json' with { type: 'json' };
+
+/**
+ * Default ZK circuit bundled with the SDK.
+ * Use this if you don't want to provide your own circuit.
+ */
+export const DEFAULT_CIRCUIT = circuitJson;
+
+// Re-export types for SDK users
+export type { ProposalMetadata, ProposalSummary, EligibleProposal };
 
 let PROGRAM_ID: PublicKey | null = null;
 
@@ -44,8 +56,22 @@ export class SolvrnClient {
         this.encryption = new SolvrnEncryption(arciumProgramId);
     }
 
-    public async init(circuitJson: any) {
-        await this.prover.init(circuitJson);
+    /**
+     * Initialize the ZK prover backend.
+     * If no circuit is provided, uses the bundled default circuit.
+     * 
+     * @param circuit - Optional custom circuit JSON. If not provided, uses bundled circuit.
+     */
+    public async init(circuit?: any) {
+        const circuitToUse = circuit || DEFAULT_CIRCUIT;
+        await this.prover.init(circuitToUse);
+    }
+    
+    /**
+     * Check if the SDK is initialized and ready for voting.
+     */
+    public isReady(): boolean {
+        return this.prover.isInitialized();
     }
 
   /**

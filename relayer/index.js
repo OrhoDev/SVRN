@@ -123,6 +123,111 @@ async function initZK() {
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+// ==========================================
+// PROPOSAL DISCOVERY (SDK Feature)
+// ==========================================
+// Get all proposals
+app.get('/proposals', (req, res) => {
+    try {
+        const proposals = Object.keys(SNAPSHOT_DB).map(id => ({
+            proposalId: Number(id),
+            root: SNAPSHOT_DB[id].root,
+            voterCount: Object.keys(SNAPSHOT_DB[id].voterMap || {}).length,
+            metadata: SNAPSHOT_DB[id].metadata || {},
+            createdAt: SNAPSHOT_DB[id].createdAt || null
+        }));
+        // Sort by proposalId descending (newest first)
+        proposals.sort((a, b) => b.proposalId - a.proposalId);
+        res.json({ success: true, proposals, count: proposals.length });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+// Get active proposals (not executed)
+app.get('/proposals/active', async (req, res) => {
+    try {
+        const proposals = [];
+        for (const id of Object.keys(SNAPSHOT_DB)) {
+            const snap = SNAPSHOT_DB[id];
+            // Check on-chain status
+            let isExecuted = false;
+            try {
+                const proposalBn = new anchor.BN(Number(id));
+                const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+                const proposalAccount = await program.account.proposal.fetch(proposalPda);
+                isExecuted = proposalAccount.isExecuted;
+            }
+            catch (e) {
+                // Proposal might not exist on-chain yet
+            }
+            if (!isExecuted) {
+                proposals.push({
+                    proposalId: Number(id),
+                    root: snap.root,
+                    voterCount: Object.keys(snap.voterMap || {}).length,
+                    metadata: snap.metadata || {},
+                    createdAt: snap.createdAt || null
+                });
+            }
+        }
+        proposals.sort((a, b) => b.proposalId - a.proposalId);
+        res.json({ success: true, proposals, count: proposals.length });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+// Get proposals by voting mint
+app.get('/proposals/by-mint/:mint', (req, res) => {
+    try {
+        const mint = req.params.mint;
+        const proposals = [];
+        for (const id of Object.keys(SNAPSHOT_DB)) {
+            const snap = SNAPSHOT_DB[id];
+            if (snap.votingMint === mint) {
+                proposals.push({
+                    proposalId: Number(id),
+                    root: snap.root,
+                    voterCount: Object.keys(snap.voterMap || {}).length,
+                    metadata: snap.metadata || {},
+                    createdAt: snap.createdAt || null
+                });
+            }
+        }
+        proposals.sort((a, b) => b.proposalId - a.proposalId);
+        res.json({ success: true, proposals, count: proposals.length });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+// Check eligibility for a wallet across all proposals
+app.get('/proposals/eligible/:wallet', (req, res) => {
+    try {
+        const wallet = req.params.wallet;
+        const eligible = [];
+        for (const id of Object.keys(SNAPSHOT_DB)) {
+            const snap = SNAPSHOT_DB[id];
+            const voter = snap.voterMap?.[wallet];
+            if (voter) {
+                eligible.push({
+                    proposalId: Number(id),
+                    root: snap.root,
+                    weight: voter.weight,
+                    balance: voter.balance,
+                    metadata: snap.metadata || {},
+                    createdAt: snap.createdAt || null
+                });
+            }
+        }
+        eligible.sort((a, b) => b.proposalId - a.proposalId);
+        res.json({ success: true, proposals: eligible, count: eligible.length });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
 // Initialize ZK before starting server
 async function startServer() {
     await initZK();
@@ -257,37 +362,35 @@ app.post('/initialize-snapshot', async (req, res) => {
         let voters = accounts.map((acc) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v) => v.balance > 0).slice(0, 256);
         console.log(`[initialize-snapshot] After filtering: ${voters.length} voters`);
-        // DEMO MODE: Add creator if not already in voters
+        // PRODUCTION MODE: Only add creator if they have tokens
         if (creator) {
-            console.log(`[initialize-snapshot] Creator provided: ${creator.slice(0, 8)}...`);
             const creatorInVoters = voters.find((v) => v.owner === creator);
             if (!creatorInVoters) {
-                // For demo: add creator with minimal balance
-                voters.unshift({ owner: creator, balance: 1000000 });
-                console.log(`[initialize-snapshot] DEMO MODE: Force-added creator. Total voters: ${voters.length}`);
+                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... has no tokens. Not adding to voter list.`);
+                // In production mode, we DON'T force-add creators without tokens
+                // Uncomment the following lines for demo/testing mode:
+                /*
+                voters.unshift({
+                    owner: creator,
+                    balance: 1000000 // Default to 1 SOL for demo
+                });
+                console.log(`DEMO MODE: Force-added creator ${creator.slice(0,6)}... at beginning`);
+                */
             }
             else {
-                console.log(`[initialize-snapshot] Creator already in list`);
-            }
-        }
-        else {
-            console.log(`[initialize-snapshot] WARNING: No creator provided!`);
-        }
-        // NOW build voterMap - creator is already in voters array
-        // Safety check: if still empty and creator was provided, add it anyway
-        if (voters.length === 0) {
-            if (creator) {
-                console.log(`[initialize-snapshot] ERROR: Voters empty but creator provided. Adding creator anyway.`);
-                voters.unshift({ owner: creator, balance: 1000000 });
-            }
-            else {
-                console.log(`[initialize-snapshot] ERROR: No voters and no creator!`);
-                throw new Error("No token holders found and no creator provided.");
+                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... already in voter list with ${creatorInVoters.balance} tokens`);
             }
         }
         console.log(`[initialize-snapshot] Final voter count: ${voters.length}`);
         const leavesFr = [];
         const voterMap = {};
+        console.log(`\n=== BUILDING MERKLE TREE DEBUG ===`);
+        console.log(`Total voters before tree building: ${voters.length}`);
+        for (let i = 0; i < Math.min(voters.length, 5); i++) {
+            console.log(`  [${i}] ${voters[i].owner.slice(0, 8)}... balance=${voters[i].balance}`);
+        }
+        if (voters.length > 5)
+            console.log(`  ... and ${voters.length - 5} more`);
         console.log(`\n--- BUILDING QUADRATIC VOTING TREE (Prop #${propKey}) ---`);
         console.log(`Total voters before creator check: ${voters.length}`);
         for (let i = 0; i < voters.length; i++) {
@@ -311,6 +414,7 @@ app.post('/initialize-snapshot', async (req, res) => {
         const zeroLeaf = await noirHash(0, 0);
         while (leavesFr.length < 256)
             leavesFr.push(zeroLeaf);
+        console.log(`Building Merkle tree with ${leavesFr.length} leaves...`);
         const levels = [leavesFr.map(f => f.toString())];
         let currentLevel = leavesFr;
         while (currentLevel.length > 1) {
@@ -326,6 +430,10 @@ app.post('/initialize-snapshot', async (req, res) => {
             levels.push(currentLevel.map(f => f.toString()));
         }
         const root = levels[levels.length - 1][0];
+        console.log(`=== TREE BUILT ===`);
+        console.log(`Final root: ${root}`);
+        console.log(`Tree depth: ${levels.length}`);
+        console.log(`=== END TREE DEBUG ===`);
         // UPDATED: Now saving metadata into the DB
         SNAPSHOT_DB[propKey] = { root, voterMap, levels, metadata: metadata || {} };
         console.log(`📸 Snapshot Built. Root: ${root.slice(0, 16)}...`);
@@ -404,13 +512,23 @@ app.post('/create-proposal', async (req, res) => {
         const accounts = data.result?.token_accounts || [];
         let voters = accounts.map((acc) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v) => v.balance > 0).slice(0, 256);
-        // Add creator to voters if not already in list (for demo/testing)
+        // PRODUCTION MODE: Only add creator if they have tokens
         if (creator) {
             const creatorInVoters = voters.find((v) => v.owner === creator);
             if (!creatorInVoters) {
-                // For demo: add creator with minimal balance
-                voters.unshift({ owner: creator, balance: 1000000 });
-                console.log(`   Added creator to voter list (demo mode)`);
+                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... has no tokens. Not adding to voter list.`);
+                // In production mode, we DON'T force-add creators without tokens
+                // Uncomment the following lines for demo/testing mode:
+                /*
+                voters.unshift({
+                    owner: creator,
+                    balance: 1000000 // Default to 1 SOL for demo
+                });
+                console.log(`DEMO MODE: Force-added creator ${creator.slice(0,6)}... at beginning`);
+                */
+            }
+            else {
+                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... already in voter list with ${creatorInVoters.balance} tokens`);
             }
         }
         if (voters.length === 0) {
@@ -658,14 +776,27 @@ app.post('/demo-add-creator', async (req, res) => {
 // 2. PROOF GENERATION (Voting)
 // ==========================================
 app.post('/get-proof', (req, res) => {
+    console.log("=== GET-PROOF DEBUG ===");
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+    console.log("Available proposals in SNAPSHOT_DB:", Object.keys(SNAPSHOT_DB));
     try {
         const { proposalId, userPubkey } = req.body;
         const snap = SNAPSHOT_DB[proposalId.toString()];
-        if (!snap)
+        console.log(`Looking for proposal ${proposalId} in SNAPSHOT_DB...`);
+        console.log(`Found snapshot:`, snap ? 'YES' : 'NO');
+        if (!snap) {
+            console.log("ERROR: Snapshot not found for proposal", proposalId);
             return res.status(404).json({ error: "Snapshot not found" });
+        }
+        console.log(`Snapshot root: ${snap.root}`);
+        console.log(`Snapshot voter count: ${Object.keys(snap.voterMap || {}).length}`);
         const voter = snap.voterMap[userPubkey];
-        if (!voter)
+        if (!voter) {
+            console.log("ERROR: Voter not found in snapshot", userPubkey);
+            console.log("Available voters:", Object.keys(snap.voterMap));
             return res.status(403).json({ error: "Ineligible" });
+        }
+        console.log(`Voter found: index=${voter.index}, balance=${voter.balance}, weight=${voter.weight}`);
         const path = [];
         let currIdx = voter.index;
         for (let i = 0; i < 8; i++) {
@@ -674,11 +805,13 @@ app.post('/get-proof', (req, res) => {
             currIdx = Math.floor(currIdx / 2);
         }
         const proof = { ...voter, path, root: snap.root };
-        console.log(`Proof requested - proposal=${proposalId} user=${userPubkey} index=${voter.index} root=${snap.root.slice(0, 16)}...`);
-        console.log(`       Proof.path: [${path.map(p => p.slice(0, 8)).join(', ')}]`);
+        console.log(`Proof generated - proposal=${proposalId} user=${userPubkey} index=${voter.index} root=${snap.root.slice(0, 16)}...`);
+        console.log(`Proof.path[0]: ${path[0].slice(0, 16)}...`);
+        console.log("=== GET-PROOF RESPONSE SENT ===");
         res.json({ success: true, proof });
     }
     catch (e) {
+        console.log("ERROR in get-proof:", e.message);
         res.status(500).json({ error: e.message });
     }
 });

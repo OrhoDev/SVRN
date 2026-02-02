@@ -20,6 +20,19 @@ export interface ProposalMetadata {
     duration: number; // in hours
 }
 
+export interface ProposalSummary {
+    proposalId: number;
+    root: string;
+    voterCount: number;
+    metadata: ProposalMetadata;
+    createdAt: number | null;
+}
+
+export interface EligibleProposal extends ProposalSummary {
+    weight: number;
+    balance: number;
+}
+
 export class SolvrnApi {
     constructor(private baseUrl: string) {}
 
@@ -45,7 +58,21 @@ export class SolvrnApi {
     }
 
     async getProof(proposalId: number, userPubkey: string): Promise<ProofResponse> {
+        console.log("=== API GET-PROOF CALL ===");
+        console.log("proposalId:", proposalId);
+        console.log("userPubkey:", userPubkey);
+        console.log("baseUrl:", this.baseUrl);
+        
         const res = await this.post('get-proof', { proposalId: proposalId.toString(), userPubkey });
+        
+        console.log("=== API GET-PROOF RESPONSE ===");
+        console.log("Response success:", res.success);
+        if (res.success) {
+            console.log("Proof root:", res.proof.root);
+            console.log("Proof index:", res.proof.index);
+            console.log("Proof weight:", res.proof.weight);
+        }
+        
         if (!res.success) throw new Error(res.error || "Failed to fetch merkle proof");
         return res;
     }
@@ -70,6 +97,84 @@ export class SolvrnApi {
 
     async getVoteCounts(proposalId: number) {
         return this.get(`vote-counts/${proposalId}`);
+    }
+
+    // ==========================================
+    // PROPOSAL DISCOVERY (New SDK Feature)
+    // ==========================================
+
+    /**
+     * Get all proposals from the relayer.
+     * Returns proposal IDs, metadata, voter counts, and roots.
+     */
+    async getAllProposals(): Promise<{ 
+        success: boolean; 
+        proposals: ProposalSummary[]; 
+        count: number; 
+        error?: string 
+    }> {
+        return this.get('proposals');
+    }
+
+    /**
+     * Get active (non-executed) proposals.
+     * Checks on-chain status to filter out executed proposals.
+     */
+    async getActiveProposals(): Promise<{ 
+        success: boolean; 
+        proposals: ProposalSummary[]; 
+        count: number; 
+        error?: string 
+    }> {
+        return this.get('proposals/active');
+    }
+
+    /**
+     * Get proposals by voting mint address.
+     * Useful for DAOs that want to show only their token's proposals.
+     */
+    async getProposalsByMint(mint: string): Promise<{ 
+        success: boolean; 
+        proposals: ProposalSummary[]; 
+        count: number; 
+        error?: string 
+    }> {
+        return this.get(`proposals/by-mint/${mint}`);
+    }
+
+    /**
+     * Get proposals where a wallet is eligible to vote.
+     * Returns proposals where the wallet is in the voter snapshot.
+     */
+    async getEligibleProposals(wallet: string): Promise<{ 
+        success: boolean; 
+        proposals: EligibleProposal[]; 
+        count: number; 
+        error?: string 
+    }> {
+        return this.get(`proposals/eligible/${wallet}`);
+    }
+
+    /**
+     * Check if a wallet can vote on a specific proposal.
+     * Returns eligibility status and voting weight.
+     */
+    async checkEligibility(proposalId: number, wallet: string): Promise<{
+        eligible: boolean;
+        weight?: number;
+        balance?: number;
+        error?: string;
+    }> {
+        try {
+            const proof = await this.getProof(proposalId, wallet);
+            return {
+                eligible: true,
+                weight: Number(proof.proof.weight),
+                balance: Number(proof.proof.balance)
+            };
+        } catch (e: any) {
+            return { eligible: false, error: e.message };
+        }
     }
 
     // --- PRIVACY-PRESERVING PROPOSAL CREATION ---
@@ -117,7 +222,11 @@ export class SolvrnApi {
         const allowedEndpoints = [
             'next-proposal-id',
             'proposal',
-            'vote-counts'
+            'vote-counts',
+            'proposals',
+            'proposals/active',
+            'proposals/by-mint',
+            'proposals/eligible'
         ];
         
         // Check if endpoint matches any allowed pattern

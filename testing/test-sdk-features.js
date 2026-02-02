@@ -3,7 +3,7 @@
  * Tests snapshot building, serialization, and message signing
  */
 
-import { SolvrnClient, SnapshotBuilder, deriveSecret, computeQuadraticWeight, createVoteMessage, verifySignedVote } from './sdk/dist/index.js';
+import { SolvrnClient, SnapshotBuilder, deriveSecret, computeQuadraticWeight, createVoteMessage, verifySignedVote } from '../sdk/dist/index.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -91,7 +91,7 @@ async function main() {
         metadata: { test: true }
     };
 
-    const { serializeSnapshot, deserializeSnapshot } = await import('./sdk/dist/index.js');
+    const { serializeSnapshot, deserializeSnapshot } = await import('../sdk/dist/index.js');
     const serialized = serializeSnapshot(mockSnapshot);
     const deserialized = deserializeSnapshot(serialized);
     

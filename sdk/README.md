@@ -14,37 +14,65 @@ npm install solvrn-sdk
 
 ```typescript
 import { SolvrnClient } from 'solvrn-sdk';
-import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { Connection, Keypair } from '@solana/web3.js';
+import { AnchorProvider } from '@coral-xyz/anchor';
 
 // Initialize the client
-const solvrn = new SolvrnClient(
-  'http://localhost:3000',  // Relayer URL
-  'DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS',  // Arcium Program ID (optional)
-  'AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv'   // Solvrn Program ID (optional)
-);
+const solvrn = new SolvrnClient('https://your-relayer.com');
 
-// Initialize ZK backend (must be called once)
-await solvrn.init(circuitJson); // Pass compiled Noir circuit JSON
+// Initialize ZK backend (circuit is bundled - no need to provide it!)
+await solvrn.init();
+
+// Discover proposals you can vote on
+const { proposals } = await solvrn.api.getEligibleProposals(wallet.publicKey.toBase58());
+console.log(`You can vote on ${proposals.length} proposals`);
 
 // Create a proposal
-const { proposalId, txid } = await solvrn.createProposal(
-  provider,      // AnchorProvider
-  authority,     // PublicKey
-  votingMint,    // Token mint address
-  metadata,      // { title, desc, duration }
-  gasBufferSol  // SOL amount for gas (e.g., 0.05)
+const { proposalId } = await solvrn.createProposal(
+  provider, authority, votingMint, 
+  { title: "Fund Development", desc: "Allocate 5000 USDC", duration: 72 },
+  0.05
 );
 
-// Cast a vote (full flow)
-const result = await solvrn.castVote(
-  provider,      // AnchorProvider
-  walletPubkey,  // string (base58)
-  proposalId,    // number
-  choice         // 0 = NO, 1 = YES
-);
-
+// Cast a vote (SDK handles ZK proof + encryption + submission)
+const result = await solvrn.castVote(provider, wallet, proposalId, 1); // 1 = YES
 console.log('Vote submitted:', result.tx);
+```
+
+## What's New
+
+**Proposal Discovery** — Find proposals without knowing IDs:
+```typescript
+// Get all proposals
+const all = await solvrn.api.getAllProposals();
+
+// Get active (not executed) proposals
+const active = await solvrn.api.getActiveProposals();
+
+// Get proposals for a specific token
+const byMint = await solvrn.api.getProposalsByMint(mintAddress);
+
+// Get proposals where a wallet can vote
+const eligible = await solvrn.api.getEligibleProposals(walletAddress);
+
+// Check if a wallet can vote on a specific proposal
+const check = await solvrn.api.checkEligibility(proposalId, walletAddress);
+if (check.eligible) {
+  console.log(`Can vote with weight: ${check.weight}`);
+}
+```
+
+**Bundled Circuit** — No need to provide circuit JSON:
+```typescript
+// Old way (still works)
+await solvrn.init(myCircuitJson);
+
+// New way (uses bundled circuit)
+await solvrn.init();
+
+// Check if ready
+if (solvrn.isReady()) {
+  console.log('SDK ready for voting');
+}
 ```
 
 ## API
@@ -60,29 +88,39 @@ constructor(
 )
 ```
 
-#### Methods
+#### Core Methods
 
-- **`init(circuitJson: any): Promise<void>`** — Initialize ZK backend with Noir circuit
-- **`createProposal(provider, authority, votingMint, metadata, gasBufferSol, proposalIdOverride?): Promise<{proposalId, txid}>`** — Create voting proposal and snapshot
-- **`castVote(provider, walletPubkey, proposalId, choice): Promise<{success, tx, error}>`** — Full voting flow (proof + encryption + submission)
-- **`api.getNextProposalId(): Promise<{nextId, success}>`** — Get next available proposal ID
-- **`api.initializeSnapshot(proposalId, votingMint, metadata, creator): Promise<SnapshotResponse>`** — Initialize voting snapshot
+- **`init(circuit?): Promise<void>`** — Initialize ZK backend (circuit is optional, bundled by default)
+- **`isReady(): boolean`** — Check if SDK is initialized
+- **`createProposal(...): Promise<{proposalId, txid}>`** — Create voting proposal
+- **`castVote(...): Promise<{success, tx, error}>`** — Full voting flow (ZK proof + encryption + submission)
+
+#### Proposal Discovery (NEW)
+
+- **`api.getAllProposals(): Promise<{proposals, count}>`** — Get all proposals
+- **`api.getActiveProposals(): Promise<{proposals, count}>`** — Get active (non-executed) proposals
+- **`api.getProposalsByMint(mint): Promise<{proposals, count}>`** — Get proposals by voting token
+- **`api.getEligibleProposals(wallet): Promise<{proposals, count}>`** — Get proposals where wallet can vote
+- **`api.checkEligibility(proposalId, wallet): Promise<{eligible, weight, balance}>`** — Check voting eligibility
+
+#### Other API Methods
+
+- **`api.getNextProposalId(): Promise<{nextId}>`** — Get next proposal ID
 - **`api.getProposal(proposalId): Promise<ProposalResponse>`** — Get proposal data
-- **`api.getProof(proposalId, userPubkey): Promise<ProofResponse>`** — Get Merkle proof for voter
-- **`api.submitVote(proposalId, nullifier, encryptedBallot): Promise<SubmitVoteResponse>`** — Submit encrypted vote
+- **`api.getProof(proposalId, userPubkey): Promise<ProofResponse>`** — Get Merkle proof
 - **`api.getVoteCounts(proposalId): Promise<VoteCountsResponse>`** — Get vote counts
-- **`api.proveTally(proposalId, yesVotes, noVotes, threshold, quorum): Promise<TallyProofResponse>`** — Generate ZK tally proof
+- **`api.proveTally(...): Promise<TallyProofResponse>`** — Generate ZK tally proof
 
 ### Sub-modules
 
-- **`prover.generateVoteProof(secret, proofData, proposalId)`** — Generate ZK proof of eligibility
-- **`encryption.encryptVote(provider, voteChoice, votingWeight)`** — Encrypt vote using Arcium MPC
+- **`prover.generateVoteProof(secret, proofData, proposalId)`** — Generate ZK eligibility proof
+- **`encryption.encryptVote(provider, voteChoice, votingWeight)`** — Encrypt vote with Arcium MPC
 
 ## Requirements
 
-- Relayer running at `relayerUrl` (see [Solvrn Relayer](https://github.com/solvrn-labs/solvrn-relayer))
-- Compiled Noir circuit JSON (from `frontend/circuit/target/circuit.json`)
+- Relayer running at `relayerUrl`
 - Solana wallet connected via AnchorProvider
+- (Circuit JSON is now bundled — no longer required!)
 
 ## How It Works
 

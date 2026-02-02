@@ -4,7 +4,7 @@
  * Run: node test-features.js
  */
 
-import { SolvrnClient, deriveSecret, computeQuadraticWeight, createVoteMessage, serializeSnapshot, deserializeSnapshot } from './sdk/dist/index.js';
+import { SolvrnClient, deriveSecret, computeQuadraticWeight, createVoteMessage, serializeSnapshot, deserializeSnapshot } from '../sdk/dist/index.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
