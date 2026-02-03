@@ -43,8 +43,8 @@ Production example with custom relayer and program IDs.
 ```typescript
 const solvrn = new SolvrnClient(
   'https://your-relayer.com',
-  'DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS',  // Arcium Program ID
-  'AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv'   // SOLVRN Program ID
+  'DBC...eb9JTS',  // Arcium Program ID
+  'AL2...J3LXcv'   // SOLVRN Program ID
 );
 ```
 
@@ -148,7 +148,7 @@ solvrn/
 
 - SDK: [npmjs.com/package/solvrn-sdk](https://www.npmjs.com/package/solvrn-sdk)
 - Documentation: [sdk/README.md](./sdk/README.md)
-- Live Demo: [solvrn.vercel.app](https://solvrn.vercel.app) (development preview)
+- Live Demo: [solvrn.vercel.app](https://solvrn.vercel.app) 
 - Repository: [github.com/OrhoDev/SVRN](https://github.com/OrhoDev/SVRN)
 
 ## License
