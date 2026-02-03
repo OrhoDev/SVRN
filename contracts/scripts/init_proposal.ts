@@ -18,7 +18,6 @@ async function main() {
   const program = anchor.workspace.SolvoteChain as Program<SolvoteChain>;
 
   const PROPOSAL_ID = new anchor.BN(1);
-  // Use SystemProgram ID to represent native SOL
   const SOL_MINT = new PublicKey("11111111111111111111111111111111");
   
   // For demo: Use zero root (will be computed properly in production)

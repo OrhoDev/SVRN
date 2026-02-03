@@ -5,7 +5,7 @@ const { Connection, Keypair, LAMPORTS_PER_SOL } = require('@solana/web3.js');
 // 1. Setup
 const RELAYER_URL = "https://injured-catering-reactions-protocol.trycloudflare.com";
 const connection = new Connection("https://api.devnet.solana.com", "confirmed");
-const testUser = Keypair.generate(); // Temporary keypair for testing
+const testUser = Keypair.generate();
 
 async function runTest() {
     console.log("Starting Full SDK Integration Test...");

@@ -27,6 +27,13 @@ keys/**/*.json
 *.secret
 *.private
 
+# Utility and development scripts
+finalize_comp_def.*
+check_cluster_offset.*
+integration.test.js
+test-*.js
+test-*.ts
+
 # IDE
 .vscode/
 .idea/

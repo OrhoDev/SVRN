@@ -304,10 +304,6 @@ async function getHighestProposalId() {
         return 0; // Default to 0 if we can't fetch
     }
 }
-// ==========================================
-// 0. NEW: INFO ROUTES (Fixes SDK 404s)
-// ==========================================
-// Fixes: "Unexpected token <" when SDK calls getNextProposalId
 app.get('/next-proposal-id', async (req, res) => {
     try {
         // Get highest proposal ID from on-chain accounts
@@ -336,9 +332,8 @@ app.post('/admin/reset-proposals', (req, res) => {
     console.log("🔄 Proposal database reset - all proposal IDs cleared");
     res.json({ success: true, message: "Proposal database reset successfully" });
 });
-// Fixes: SDK ability to fetch proposal details
 app.get('/proposal/:id', (req, res) => {
-    const proposalId = req.params.id; // Explicitly cast to string
+    const proposalId = req.params.id;
     const snap = SNAPSHOT_DB[proposalId];
     if (!snap) {
         return res.status(404).json({ success: false, error: "Proposal not found" });

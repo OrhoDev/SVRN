@@ -21,7 +21,6 @@ describe('Solvrn Relayer API Integration Tests', () => {
   let testProposalId: number;
 
   beforeAll(async () => {
-    // Get a test proposal ID
     try {
       const result = await fetchAPI('/next-proposal-id');
       testProposalId = result.nextId || 1;

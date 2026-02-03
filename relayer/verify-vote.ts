@@ -4,7 +4,7 @@ import * as fs from 'fs';
 
 const PROGRAM_ID = new PublicKey("2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg");
 // const connection = new Connection("https://api.devnet.solana.com", "confirmed");
-const connection = new Connection("http://127.0.0.1:8899", "confirmed"); // Hardcoded for local testing
+const connection = new Connection("http://127.0.0.1:8899", "confirmed");
 
 async function verifyVote(proposalId: number) {
     console.log(`\nVerifying Proposal #${proposalId}...\n`);

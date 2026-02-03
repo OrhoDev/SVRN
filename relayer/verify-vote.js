@@ -38,7 +38,7 @@ const anchor_1 = require("@coral-xyz/anchor");
 const fs = __importStar(require("fs"));
 const PROGRAM_ID = new web3_js_1.PublicKey("2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg");
 // const connection = new Connection("https://api.devnet.solana.com", "confirmed");
-const connection = new web3_js_1.Connection("http://127.0.0.1:8899", "confirmed"); // Hardcoded for local testing
+const connection = new web3_js_1.Connection("http://127.0.0.1:8899", "confirmed");
 async function verifyVote(proposalId) {
     console.log(`\nVerifying Proposal #${proposalId}...\n`);
     // Load IDL

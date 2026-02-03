@@ -67,7 +67,7 @@ async function main() {
     // 2. SETUP
     // Support Helius RPC via environment variable, fallback to localnet for testing
     // const rpcUrl = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
-    const rpcUrl = "http://127.0.0.1:8899"; // Hardcoded for local testing
+    const rpcUrl = "http://127.0.0.1:8899";
     const connection = new Connection(rpcUrl, "confirmed");
     const keypairData = JSON.parse(fs.readFileSync('./relayer-keypair.json', 'utf-8'));
     const keypair = Keypair.fromSecretKey(new Uint8Array(keypairData));

@@ -12,8 +12,8 @@ export const encryptVote = async (provider, voteChoice, realBalance) => {
     // Keygen can take 2-5 minutes after initialization, so we retry for up to 6 minutes
     let mxePublicKey = null;
     let attempts = 0;
-    const maxAttempts = 120; // 120 attempts × 3 seconds = 6 minutes total
-    const retryDelayMs = 3000; // 3 seconds between attempts
+    const maxAttempts = 120;
+    const retryDelayMs = 3000;
     
     while (!mxePublicKey && attempts < maxAttempts) {
       try {
