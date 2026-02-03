@@ -43,7 +43,7 @@ const result = await solvrn.castVote(
 
 ## Default Relayer
 
-The SDK includes a default relayer for development and testing at `https://injured-catering-reactions-protocol.trycloudflare.com`. This allows you to start building immediately without hosting your own relayer.
+The SDK includes a default relayer for development and testing at `https://farms-series-congress-baseball.trycloudflare.com`. This allows you to start building immediately without hosting your own relayer.
 
 For production deployments, run your own relayer instance to ensure availability and control over infrastructure.
 

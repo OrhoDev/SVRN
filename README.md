@@ -52,7 +52,7 @@ See the full API reference at [sdk/README.md](./sdk/README.md).
 
 ## Default Relayer Warning
 
-The SDK includes a temporary default relayer at `https://injured-catering-reactions-protocol.trycloudflare.com` for quick testing. This is a Cloudflare tunnel that could change or disappear without notice. Do not use it for production or anything important.
+The SDK includes a temporary default relayer at `https://farms-series-congress-baseball.trycloudflare.com` for quick testing. This is a Cloudflare tunnel that could change or disappear without notice. Do not use it for production or anything important.
 
 For production deployments, run your own relayer instance. See the Development section below for setup instructions.
 
