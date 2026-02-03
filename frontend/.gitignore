@@ -45,3 +45,4 @@ build/
 
 # Local env files
 .env*.local
+.vercel

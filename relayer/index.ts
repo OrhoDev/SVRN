@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import { Barretenberg, UltraHonkBackend, Fr } from '@aztec/bb.js'; 
@@ -26,6 +27,14 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Rate limiting: 100 requests per 2 minutes per IP
+const limiter = rateLimit({
+  windowMs: 2 * 60 * 1000, // 2 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { success: false, error: "Too many requests, please try again later" }
+});
+app.use(limiter);
 
 // --- LOAD TALLY CIRCUIT ---
 const tallyCircuitPath = path.join(__dirname, 'tally.json');
@@ -356,6 +365,17 @@ app.post('/initialize-snapshot', async (req: Request, res: Response) => {
         
         // UPDATED: Now destructuring metadata and creator only
         const { votingMint, proposalId, metadata, creator } = req.body;
+        
+        // Input validation
+        console.log(`[DEBUG] proposalId: ${proposalId} (type: ${typeof proposalId})`);
+        
+        if (proposalId === undefined || proposalId === null || typeof proposalId !== 'number' || proposalId < 0) {
+            console.log(`[DEBUG] proposalId validation FAILED`);
+            return res.status(400).json({ success: false, error: "Invalid proposalId" });
+        }
+        
+        console.log(`[DEBUG] All validation PASSED`);
+        
         console.log(`[initialize-snapshot] Received: proposalId=${proposalId}, creator=${creator ? creator.slice(0,8) + '...' : 'UNDEFINED'}`);
         const propKey = proposalId.toString(); 
 

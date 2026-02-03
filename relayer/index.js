@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const web3_js_1 = require("@solana/web3.js");
 const anchor = __importStar(require("@coral-xyz/anchor"));
 const bb_js_1 = require("@aztec/bb.js");
@@ -53,6 +54,13 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
+// Rate limiting: 100 requests per 2 minutes per IP
+const limiter = (0, express_rate_limit_1.default)({
+    windowMs: 2 * 60 * 1000, // 2 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: { success: false, error: "Too many requests, please try again later" }
+});
+app.use(limiter);
 // --- LOAD TALLY CIRCUIT ---
 const tallyCircuitPath = path_1.default.join(__dirname, 'tally.json');
 let tallyCircuit;
@@ -346,6 +354,13 @@ app.post('/initialize-snapshot', async (req, res) => {
             return res.status(503).json({ error: "ZK Backend initializing..." });
         // UPDATED: Now destructuring metadata and creator only
         const { votingMint, proposalId, metadata, creator } = req.body;
+        // Input validation
+        console.log(`[DEBUG] proposalId: ${proposalId} (type: ${typeof proposalId})`);
+        if (proposalId === undefined || proposalId === null || typeof proposalId !== 'number' || proposalId < 0) {
+            console.log(`[DEBUG] proposalId validation FAILED`);
+            return res.status(400).json({ success: false, error: "Invalid proposalId" });
+        }
+        console.log(`[DEBUG] All validation PASSED`);
         console.log(`[initialize-snapshot] Received: proposalId=${proposalId}, creator=${creator ? creator.slice(0, 8) + '...' : 'UNDEFINED'}`);
         const propKey = proposalId.toString();
         const response = await fetch(RPC_URL, {
