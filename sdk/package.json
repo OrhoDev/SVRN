@@ -1,6 +1,6 @@
 {
   "name": "solvrn-sdk",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Privacy SDK for Solana governance using zero-knowledge proofs and confidential computing",
   "type": "module",
   "keywords": [
@@ -15,16 +15,16 @@
     "mpc",
     "blockchain"
   ],
-  "author": "SVRN Labs",
-  "license": "ISC",
+  "author": "SOLVRN Labs",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/svrn-labs/svrn-sdk"
+    "url": "https://github.com/OrhoDev/SVRN"
   },
   "bugs": {
-    "url": "https://github.com/svrn-labs/svrn-sdk/issues"
+    "url": "https://github.com/OrhoDev/SVRN/issues"
   },
-  "homepage": "https://github.com/svrn-labs/svrn-sdk#readme",
+  "homepage": "https://github.com/OrhoDev/SVRN/tree/main/sdk#readme",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
