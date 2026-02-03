@@ -624,7 +624,7 @@ const tallyProof = await svrn.api.proveTally(
 <section id="playground" className="py-16 px-6 border-b-2 border-[var(--border-main)] bg-[var(--bg-subtle)]">
     <div className="max-w-[1400px] mx-auto">
         <div className="text-center mb-12">
-            <h2 className="text-4xl font-black uppercase mb-8 tracking-tighter leading-none text-[var(--text-main)]">See It In Action</h2>
+            <h2 className="text-5xl font-black uppercase mb-8 tracking-tighter leading-none text-[var(--text-main)]">See It In Action</h2>
         </div>
 
         {/* RESPONSIVE GRID WRAPPER */}
