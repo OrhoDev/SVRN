@@ -3,7 +3,7 @@ const { AnchorProvider, Wallet } = require('@coral-xyz/anchor');
 const { Connection, Keypair, LAMPORTS_PER_SOL } = require('@solana/web3.js');
 
 // 1. Setup
-const RELAYER_URL = "https://farms-series-congress-baseball.trycloudflare.com";
+const RELAYER_URL = "https://missed-insulin-infrastructure-vids.trycloudflare.com";
 const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 const testUser = Keypair.generate();
 

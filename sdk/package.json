@@ -1,6 +1,6 @@
 {
   "name": "solvrn-sdk",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Privacy SDK for Solana governance using zero-knowledge proofs and confidential computing",
   "type": "module",
   "keywords": [

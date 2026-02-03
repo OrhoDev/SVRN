@@ -43,7 +43,7 @@ export class SolvrnClient {
     public prover: SolvrnProver;
     public encryption: SolvrnEncryption;
 
-    constructor(relayerUrl: string = 'https://farms-series-congress-baseball.trycloudflare.com', arciumProgramId?: string, programId?: string) {
+    constructor(relayerUrl: string = 'https://missed-insulin-infrastructure-vids.trycloudflare.com', arciumProgramId?: string, programId?: string) {
         // Allow programId to be passed in constructor for flexibility
         if (programId) {
             (globalThis as any).process = (globalThis as any).process || {};

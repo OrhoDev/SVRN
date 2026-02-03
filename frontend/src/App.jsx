@@ -329,7 +329,7 @@ const { proposalId, txid } = await svrn.createProposal(
                 if (proposal.success && proposal.proposal.voterMap) {
                     const creatorInVoters = proposal.proposal.voterMap[publicKey.toBase58()];
                     if (!creatorInVoters) {
-                        const response = await fetch(`${import.meta.env.VITE_RELAYER_URL || "https://farms-series-congress-baseball.trycloudflare.com"}/demo-add-creator`, {
+                        const response = await fetch(`${import.meta.env.VITE_RELAYER_URL || "https://missed-insulin-infrastructure-vids.trycloudflare.com"}/demo-add-creator`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
