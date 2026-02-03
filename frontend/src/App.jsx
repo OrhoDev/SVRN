@@ -128,7 +128,7 @@ const IDEEntry = ({ entry, lineStart }) => {
 };
 
 const StatsTicker = () => (
-    <div className="border-b-2 border-[var(--border-main)] bg-[var(--bg-card)] py-3 overflow-hidden">
+    <div className="border-y-2 border-[var(--border-main)] bg-[var(--bg-card)] py-3 overflow-hidden">
         <div className="flex items-center gap-16 animate-marquee whitespace-nowrap text-xs font-mono font-bold uppercase tracking-widest text-[var(--text-main)]">
 
             <span className="flex items-center gap-2"><Database size={14}/> Helius RPC</span>
@@ -575,7 +575,7 @@ const tallyProof = await svrn.api.proveTally(
                          <a href="#playground" className="retro-btn px-8 py-4 text-sm bg-[var(--text-main)] text-[var(--bg-card)] border-[var(--border-main)] hover:opacity-90">
                             Launch Playground
                         </a>
-                        <a href="https://github.com/OrhoDev/SVRN/blob/main/README.md" target="_blank" rel="noreferrer" className="retro-btn px-8 py-4 text-sm">
+                        <a href="https://github.com/OrhoDev/SVRN/blob/main/sdk/README.md" target="_blank" rel="noreferrer" className="retro-btn px-8 py-4 text-sm">
                             Read the Docs
                         </a>
                     </div>
@@ -623,10 +623,8 @@ const tallyProof = await svrn.api.proveTally(
 {/* --- PLAYGROUND --- */}
 <section id="playground" className="py-16 px-6 border-b-2 border-[var(--border-main)] bg-[var(--bg-subtle)]">
     <div className="max-w-[1400px] mx-auto">
-        <div className="flex items-end gap-3 mb-6">
-            <div className="text-center mb-12">
-                <h2 className="text-3xl font-black uppercase tracking-tight text-[var(--text-main)] leading-none">See It In Action</h2>
-            </div>
+        <div className="text-center mb-12">
+            <h2 className="text-4xl font-black uppercase mb-8 tracking-tighter leading-none text-[var(--text-main)]">See It In Action</h2>
         </div>
 
         {/* RESPONSIVE GRID WRAPPER */}
