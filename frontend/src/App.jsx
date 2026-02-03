@@ -96,7 +96,7 @@ const IDEEntry = ({ entry, lineStart }) => {
                             {lineStart + i}
                         </div>
                         {/* Code line */}
-                        <div className="flex-1 px-4 py-0.5 font-mono text-[12px] leading-5">
+                        <div className="flex-1 px-4 py-0.5 font-mono text-[14px] leading-5">
                             <SyntaxHighlight code={line} />
                         </div>
                     </div>
@@ -130,18 +130,18 @@ const IDEEntry = ({ entry, lineStart }) => {
 const StatsTicker = () => (
     <div className="border-y-2 border-[var(--border-main)] bg-[var(--bg-card)] py-3 overflow-hidden">
         <div className="flex items-center gap-16 animate-marquee whitespace-nowrap text-xs font-mono font-bold uppercase tracking-widest text-[var(--text-main)]">
-            <span className="flex items-center gap-2"><Globe size={14}/> Solana Devnet</span>
+
             <span className="flex items-center gap-2"><Database size={14}/> Helius RPC</span>
             <span className="flex items-center gap-2"><Layers size={14}/> Arcium MPC Network</span>
             <span className="flex items-center gap-2"><Lock size={14}/> Noir UltraHonk ZK</span>
-            <span className="flex items-center gap-2"><Shield size={14}/> Privacy SDK v1.0</span>
+            <span className="flex items-center gap-2"><Shield size={14}/> Privacy SDK v1.0.3</span>
             <span className="flex items-center gap-2"><Database size={14}/> Merklized Census</span>
             {/* Duplicated for scroll */}
-            <span className="flex items-center gap-2"><Globe size={14}/> Solana Devnet</span>
+
             <span className="flex items-center gap-2"><Database size={14}/> Helius RPC</span>
             <span className="flex items-center gap-2"><Layers size={14}/> Arcium MPC Network</span>
             <span className="flex items-center gap-2"><Lock size={14}/> Noir UltraHonk ZK</span>
-            <span className="flex items-center gap-2"><Shield size={14}/> Privacy SDK v1.0</span>
+            <span className="flex items-center gap-2"><Shield size={14}/> Privacy SDK v1.0.3</span>
             <span className="flex items-center gap-2"><Database size={14}/> Merklized Census</span>
         </div>
     </div>
@@ -528,7 +528,7 @@ const tallyProof = await svrn.api.proveTally(
                     <div className="hidden md:flex items-center gap-6">
                         <a href="#playground" className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">Playground</a>
                         <a href="#docs" className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">Docs</a>
-                        <a href="https://github.com" target="_blank" rel="noreferrer" className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"><Github size={18} /></a>
+                        <a href="https://github.com/OrhoDev/SVRN" target="_blank" rel="noreferrer" className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"><Github size={18} /></a>
                     </div>
                     <StyledWalletButton />
                 </div>
@@ -565,18 +565,17 @@ const tallyProof = await svrn.api.proveTally(
     )}
 </div>
                     <h1 className="text-5xl md:text-8xl font-black text-[var(--text-main)] mb-6 tracking-tighter leading-[0.9]">
-                        PRIVACY SDK<br/>
-                        <span className="text-[var(--text-main)]">FOR SOLANA.</span>
+                        PRIVATE GOVERNANCE<br/>
+                        <span className="text-[var(--text-main)]">ZERO COMPROMISE.</span>
                     </h1>
                   <p className="text-[var(--text-muted)] text-lg md:text-xl mb-12 max-w-3xl mx-auto font-medium leading-relaxed">
-    SVRN is a privacy-first governance engine that abstracts the complexity of <span className="text-[var(--text-main)] font-bold underline decoration-1 underline-offset-4">Noir ZK-circuits</span> and <span className="text-[var(--text-main)] font-bold underline decoration-1 underline-offset-4">Arcium MPC clusters</span> into a drop-in SDK. 
-</p>
+   SOLVRN is a privacy-first governance engine that turns Noir ZK-circuits and Arcium MPC clusters into a drop-in SDK.</p>
                     
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
                          <a href="#playground" className="retro-btn px-8 py-4 text-sm bg-[var(--text-main)] text-[var(--bg-card)] border-[var(--border-main)] hover:opacity-90">
                             Launch Playground
                         </a>
-                        <a href="#docs" className="retro-btn px-8 py-4 text-sm">
+                        <a href="https://github.com/OrhoDev/SVRN/blob/main/README.md" target="_blank" rel="noreferrer" className="retro-btn px-8 py-4 text-sm">
                             Read the Docs
                         </a>
                     </div>
@@ -622,13 +621,12 @@ const tallyProof = await svrn.api.proveTally(
 </section>
 
 {/* --- PLAYGROUND --- */}
-<section id="playground" className="py-10 px-6 border-b-2 border-[var(--border-main)] bg-[var(--bg-subtle)]">
+<section id="playground" className="py-16 px-6 border-b-2 border-[var(--border-main)] bg-[var(--bg-subtle)]">
     <div className="max-w-[1400px] mx-auto">
         <div className="flex items-end gap-3 mb-6">
             <Terminal size={24} className="text-[var(--text-main)]"/>
-            <div>
-                <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] leading-none">Integration Lab</h2>
-                <p className="text-xs font-mono text-[var(--text-muted)]">Live SDK Environment</p>
+            <div className="text-center mb-12">
+                <h2 className="text-3xl font-black uppercase tracking-tight text-[var(--text-main)] leading-none">Try it yourself!</h2>
             </div>
         </div>
 
@@ -638,6 +636,13 @@ const tallyProof = await svrn.api.proveTally(
             {/* LEFT PANEL: CONFIGURATION */}
             <div className="lg:col-span-5 p-8 border-b lg:border-b-0 lg:border-r-2 border-[var(--border-main)] flex flex-col gap-6 bg-[var(--bg-card)] overflow-y-auto custom-scrollbar">
                 
+                {/* Wallet Connection Disclaimer */}
+                <div className="mb-6 p-4 bg-[var(--bg-subtle)] border border-[var(--border-light)] rounded-sm">
+                    <p className="text-xs text-[var(--text-main)] font-medium leading-relaxed">
+                        <strong>Important:</strong> Please connect your wallet to proceed. Make sure you have sufficient SOL in your wallet to cover the protocol fee and any transaction costs.
+                    </p>
+                </div>
+
                 {/* 1. SNAPSHOT & CONFIG */}
                 <div className="relative">
                     <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -686,10 +691,9 @@ const tallyProof = await svrn.api.proveTally(
                             </div>
                         </div>
 
-                        {/* Tightened Protocol Fee Badge */}
-                        <div className="flex justify-between items-center px-1">
-                            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-tighter">Protocol Fee</span>
-                            <span className="text-[10px] font-bold bg-black text-white px-2 py-0.5 rounded-sm">0.05 SOL</span>
+                        {/* Protocol Fee - Combined */}
+                        <div className="text-xs font-bold text-[var(--text-main)] px-4">
+                            Protocol fee: 0.05 SOL
                         </div>
 
                         <button 
@@ -728,7 +732,7 @@ const tallyProof = await svrn.api.proveTally(
                     </div>
                 </div>
 
-                <hr className="border-t-2 border-gray-400 my-2"/>
+                <hr className="border-t-2 border-[var(--border-main)] my-2"/>
 
                 {/* 3. TALLY */}
                 <div className="relative">
@@ -742,7 +746,7 @@ const tallyProof = await svrn.api.proveTally(
             </div>
 
             {/* RIGHT PANEL: VS CODE IDE WITH NARRATIVE */}
-            <div className="lg:col-span-7 bg-[#252525] flex flex-col h-[600px] lg:h-[800px] relative border-t-2 lg:border-t-0 border-[var(--border-main)] font-mono text-sm shadow-2xl">
+            <div className="lg:col-span-7 bg-[#252525] flex flex-col h-[600px] lg:h-[800px] relative border-t-2 lg:border-t-0 border-[var(--border-main)] font-mono text-base shadow-2xl">
                 {/* VS Code Tab Bar */}
                 <div className="h-9 bg-[#252526] flex items-end px-0 select-none overflow-hidden border-b border-[#1e1e1e]">
                     {/* Active Tab */}
@@ -824,21 +828,30 @@ const tallyProof = await svrn.api.proveTally(
 {/* --- SHOWCASE ONE-LINER --- */}
 <section className="py-20 bg-[var(--bg-subtle)] text-[var(--text-main)] border-y-2 border-[var(--border-main)] relative overflow-hidden">
     <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
-        <h2 className="text-4xl font-black uppercase mb-8 tracking-tighter leading-none text-[var(--text-main)]">Governance in 3 lines of code.</h2>
+        <h2 className="text-4xl font-black uppercase mb-8 tracking-tighter leading-none text-[var(--text-main)]">Governance in 5 lines of code.</h2>
         
         <div className="bg-[#252525] border-4 border-[var(--border-main)] p-8 text-left shadow-[12px_12px_0px_var(--shadow-color)] text-sm md:text-base font-mono leading-relaxed overflow-x-auto rounded-sm text-[#abb2bf]">
+            <div className="mb-4">
+                <span className="text-[#c678dd]">import</span> <span className="text-[#abb2bf]">&#123;</span> <span className="text-[#e5c07b]">SolvrnClient</span> <span className="text-[#abb2bf]">&#125;</span> <span className="text-[#c678dd]">from</span> <span className="text-[#98c379]">'solvrn-sdk'</span><span className="text-[#abb2bf]">;</span>
+            </div>
+
             <div className="mb-4">
                 <span className="text-[#5c6370] italic">// 1. Initialize Solvrn Client</span><br/>
                 <span className="text-[#c678dd]">const</span> solvrn <span className="text-[#56b6c2]">=</span> <span className="text-[#c678dd]">new</span> <span className="text-[#e5c07b]">SolvrnClient</span><span className="text-[#abb2bf]">();</span>
             </div>
 
             <div className="mb-4">
-                <span className="text-[#5c6370] italic">// 2. Create Proposal (Auto-ID & Snapshot)</span><br/>
+                <span className="text-[#5c6370] italic">// 2. Initialize ZK Circuit</span><br/>
+                <span className="text-[#c678dd]">await</span> solvrn<span className="text-[#abb2bf]">.</span><span className="text-[#61afef]">init</span><span className="text-[#abb2bf]">();</span>
+            </div>
+
+            <div className="mb-4">
+                <span className="text-[#5c6370] italic">// 3. Create Proposal (Auto-ID & Snapshot)</span><br/>
                 <span className="text-[#c678dd]">await</span> solvrn<span className="text-[#abb2bf]">.</span><span className="text-[#61afef]">createProposal</span><span className="text-[#abb2bf]">(</span>provider<span className="text-[#abb2bf]">,</span> authority<span className="text-[#abb2bf]">,</span> mint<span className="text-[#abb2bf]">,</span> meta<span className="text-[#abb2bf]">);</span>
             </div>
 
             <div>
-                <span className="text-[#5c6370] italic">// 3. Shielded Privacy Vote (ZK + MPC)</span><br/>
+                <span className="text-[#5c6370] italic">// 4. Shielded Privacy Vote (ZK + MPC)</span><br/>
                 <span className="text-[#c678dd]">await</span> solvrn<span className="text-[#abb2bf]">.</span><span className="text-[#61afef]">castVote</span><span className="text-[#abb2bf]">(</span>provider<span className="text-[#abb2bf]">,</span> user<span className="text-[#abb2bf]">,</span> id<span className="text-[#abb2bf]">,</span> <span className="text-[#d19a66]">1</span><span className="text-[#abb2bf]">);</span>
             </div>
         </div>
@@ -863,11 +876,28 @@ const tallyProof = await svrn.api.proveTally(
                                 </div>
                             </div>
                             <div className="group">
-                                <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">2. Instantiate Client</p>
+                                <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">2. Instantiate & Initialize Client</p>
                                 <div className="bg-[var(--bg-card)] border-2 border-[var(--border-main)] p-4 relative shadow-[4px_4px_0px_var(--shadow-color)] group-hover:shadow-[4px_4px_0px_var(--text-main)] transition-shadow">
                                     <pre className="text-xs font-mono text-[var(--text-main)] overflow-x-auto">
                                         <span className="font-bold text-[#a626a4]">import</span> &#123; SolvrnClient &#125; <span className="font-bold text-[#a626a4]">from</span> 'solvrn-sdk';<br/>
-                                        <span className="font-bold text-[#a626a4]">const</span> client = <span className="font-bold text-[#a626a4]">new</span> <span className="text-[#c18401]">SolvrnClient</span>(RPC_URL);
+                                        <span className="font-bold text-[#a626a4]">const</span> client = <span className="font-bold text-[#a626a4]">new</span> <span className="text-[#c18401]">SolvrnClient</span>();<br/>
+                                        <span className="font-bold text-[#a626a4]">await</span> client.<span className="text-[#c18401]">init</span>();
+                                    </pre>
+                                </div>
+                            </div>
+                            <div className="group">
+                                <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">3. Create Proposal</p>
+                                <div className="bg-[var(--bg-card)] border-2 border-[var(--border-main)] p-4 relative shadow-[4px_4px_0px_var(--shadow-color)] group-hover:shadow-[4px_4px_0px_var(--text-main)] transition-shadow">
+                                    <pre className="text-xs font-mono text-[var(--text-main)] overflow-x-auto">
+                                        <span className="font-bold text-[#a626a4]">const</span> &#123; proposalId &#125; = <span className="font-bold text-[#a626a4]">await</span> client.<span className="text-[#c18401]">createProposal</span>(provider, authority, mint, metadata, 0.05);
+                                    </pre>
+                                </div>
+                            </div>
+                            <div className="group">
+                                <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">4. Cast Private Vote</p>
+                                <div className="bg-[var(--bg-card)] border-2 border-[var(--border-main)] p-4 relative shadow-[4px_4px_0px_var(--shadow-color)] group-hover:shadow-[4px_4px_0px_var(--text-main)] transition-shadow">
+                                    <pre className="text-xs font-mono text-[var(--text-main)] overflow-x-auto">
+                                        <span className="font-bold text-[#a626a4]">await</span> client.<span className="text-[#c18401]">castVote</span>(provider, wallet, proposalId, 1); <span className="text-[#5c6370] italic">// 1 = YES, 0 = NO</span>
                                     </pre>
                                 </div>
                             </div>
@@ -878,9 +908,21 @@ const tallyProof = await svrn.api.proveTally(
                     <div>
                         <div className="mb-8 border-b-2 border-[var(--border-main)] pb-2 flex justify-between items-end">
                             <h2 className="text-2xl font-black text-[var(--text-main)] uppercase">Core Methods</h2>
-                            <span className="text-xs font-mono bg-[var(--bg-subtle)] text-[var(--text-main)] px-2 py-0.5 border border-[var(--border-light)]">v1.0</span>
+                            <span className="text-xs font-mono bg-[var(--bg-subtle)] text-[var(--text-main)] px-2 py-0.5 border border-[var(--border-light)]">v1.0.3</span>
                         </div>
                         <div className="space-y-4">
+                            <div className="border border-[var(--border-light)] bg-[var(--bg-card)] p-5 hover:border-[var(--border-main)] transition-colors group">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="font-mono text-sm font-bold text-[var(--text-main)] group-hover:text-emerald-500 transition-colors">createProposal()</span>
+                                    <span className="text-[10px] font-bold text-[var(--bg-card)] bg-[var(--text-main)] px-2 py-0.5">ASYNC</span>
+                                </div>
+                                <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
+                                    Creates a new governance proposal with automatic snapshot generation and relayer-signed transaction.
+                                </p>
+                                <div className="bg-[var(--bg-subtle)] border border-[var(--border-light)] p-2 font-mono text-[10px] text-[var(--text-main)] overflow-x-auto">
+                                    <span className="text-[#a626a4] font-bold">async</span> (provider, authority, mint, metadata, gasBuffer) <span className="text-[#a626a4] font-bold">=&gt;</span> <span className="text-[#c18401]">Promise</span>&lt;&#123; proposalId, txid &#125;&gt;
+                                </div>
+                            </div>
                             <div className="border border-[var(--border-light)] bg-[var(--bg-card)] p-5 hover:border-[var(--border-main)] transition-colors group">
                                 <div className="flex justify-between items-start mb-2">
                                     <span className="font-mono text-sm font-bold text-[var(--text-main)] group-hover:text-blue-500 transition-colors">castVote()</span>
@@ -895,7 +937,7 @@ const tallyProof = await svrn.api.proveTally(
                             </div>
                             <div className="border border-[var(--border-light)] bg-[var(--bg-card)] p-5 hover:border-[var(--border-main)] transition-colors group">
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className="font-mono text-sm font-bold text-[var(--text-main)] group-hover:text-emerald-500 transition-colors">proveTally()</span>
+                                    <span className="font-mono text-sm font-bold text-[var(--text-main)] group-hover:text-purple-500 transition-colors">proveTally()</span>
                                     <span className="text-[10px] font-bold text-[var(--bg-card)] bg-[var(--text-main)] px-2 py-0.5">ASYNC</span>
                                 </div>
                                 <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
@@ -914,18 +956,15 @@ const tallyProof = await svrn.api.proveTally(
             <footer className="bg-[var(--bg-card)] text-[var(--text-main)] py-16 border-t-2 border-[var(--border-main)]">
                 <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-12">
                     <div className="text-left">
-                        <span className="text-2xl font-black block mb-2 tracking-tighter uppercase">SVRN</span>
+                        <span className="text-2xl font-black block mb-2 tracking-tighter uppercase">SOLVRN</span>
                         <span className="text-xs text-[var(--text-muted)] font-mono">
                             Privacy Middleware for the Solana Ecosystem.<br/>
-                            &copy; 2026 Sovereign Labs.
+                            &copy; 2026 SOLVRN Labs.
                         </span>
                     </div>
 
                     <div className="flex flex-col md:flex-row items-center gap-6 md:gap-16 opacity-60 hover:opacity-100 transition-opacity">
-                        <div className="flex items-center gap-2 font-bold text-sm"><Globe size={18}/> SOLANA</div>
-                        <div className="flex items-center gap-2 font-bold text-sm"><Layers size={18}/> ARCIUM</div>
-                        <div className="flex items-center gap-2 font-bold text-sm"><Lock size={18}/> NOIR</div>
-                        <a href="https://github.com" target="_blank" rel="noreferrer"><Github size={18} /></a>
+                        <a href="https://github.com/OrhoDev/SVRN" target="_blank" rel="noreferrer"><Github size={18} /></a>
                     </div>
                 </div>
             </footer>

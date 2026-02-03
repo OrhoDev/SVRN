@@ -1,10 +1,12 @@
-# Solvrn
+# SOLVRN
 
-Solvrn is a private governance protocol for Solana that enables confidential on-chain voting using zero-knowledge proofs and secure multi-party computation.
+SOLVRN is a private governance protocol for Solana that enables confidential on-chain voting using zero-knowledge proofs and secure multi-party computation.
 
-Traditional governance systems can't keep votes private while staying verifiable. Solvrn solves this by allowing participants to vote without revealing their identity, voting power, or preferences while the system enforces eligibility, prevents double voting, and produces a fully verifiable tally.
+Traditional governance systems can't keep votes private while staying verifiable. SOLVRN solves this by allowing participants to vote without revealing their identity, voting power, or preferences while the system enforces eligibility, prevents double voting, and produces a fully verifiable tally.
 
 The protocol supports DAO voting, treasury management, and quadratic voting while keeping all votes private at every stage.
+
+Check out the live SOLVRN preview site at [https://solvrn.vercel.app](https://solvrn.vercel.app) to see private governance in action.
 
 ## Quick Start
 
@@ -20,7 +22,7 @@ Here's how to create a proposal and cast a vote.
 import { SolvrnClient } from 'solvrn-sdk';
 
 const solvrn = new SolvrnClient('https://your-relayer.com');
-await solvrn.init(circuitJson);
+await solvrn.init();
 
 const { proposalId } = await solvrn.createProposal(provider, authority, mint, metadata, 0.05);
 await solvrn.castVote(provider, wallet, proposalId, 1); // 1 = YES, 0 = NO
@@ -40,13 +42,9 @@ const solvrn = new SolvrnClient();
 
 For production deployments, you should run your own relayer instance to ensure availability and control over the infrastructure.
 
-## Live Preview
-
-Check out the live Solvrn frontend at [https://solvrn.vercel.app](https://solvrn.vercel.app) to see private governance in action.
-
 ## Architecture
 
-Solvrn has four main components that work together to enable private voting.
+SOLVRN has four main components that work together to enable private voting.
 
 The **Solana smart contract** stores proposals and encrypted votes while verifying zero-knowledge proofs. The contract never sees plaintext votes or voter identities and is deployed at `AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv`.
 
@@ -114,10 +112,10 @@ import { Connection, PublicKey } from '@solana/web3.js';
 const solvrn = new SolvrnClient(
   'https://your-relayer.com',
   'DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS',  // Arcium Program ID
-  'AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv'   // Solvrn Program ID
+  'AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv'   // SOLVRN Program ID
 );
 
-await solvrn.init(circuitJson);
+await solvrn.init();
 
 const { proposalId, txid } = await solvrn.createProposal(
     provider,
@@ -156,17 +154,17 @@ Configure your environment variables by copying `.env.example` to `.env` and set
 
 ## Security Model
 
-Solvrn ensures that voter identities and voting choices are never revealed on-chain and cannot be correlated through protocol interactions.
+SOLVRN ensures that voter identities and voting choices are never revealed on-chain and cannot be correlated through protocol interactions.
 
 Integrity is enforced through nullifiers that prevent double voting, zero-knowledge verified tallies, and immutable on-chain records. All critical state transitions are verifiable and auditable without compromising privacy.
 
-The encryption and ZK proof systems are production-ready. Vote decryption is simulated but this doesn't affect the privacy guarantees since votes remain encrypted and private regardless.
+The encryption and ZK proof systems are implemented end-to-end and used in the current flow. Vote decryption is simulated but this doesn't affect the privacy guarantees since votes remain encrypted and private regardless.
 
 ## Project Structure
 
 ```
 solvrn/
-├── sdk/              # Solvrn SDK (npm: solvrn-sdk)
+├── sdk/              # SOLVRN SDK (npm: solvrn-sdk)
 ├── relayer/          # Node.js/Express middleware
 ├── frontend/         # Demo frontend
 ├── contracts/        # Solana program (Anchor)
