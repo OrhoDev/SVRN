@@ -25,11 +25,12 @@
     "@solana/wallet-adapter-wallets": "^0.19.37",
     "@tailwindcss/vite": "^4.1.18",
     "@vitejs/plugin-react": "^5.1.2",
+    "crypto-browserify": "^3.12.1",
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "shiki": "^3.21.0",
-    "solvrn-sdk": "../sdk",
+    "solvrn-sdk": "^1.0.3",
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {

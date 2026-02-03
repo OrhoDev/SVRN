@@ -1,5 +1,4 @@
 import { defineConfig } from 'vite';
-import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -7,22 +6,23 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    nodePolyfills({
-      globals: {
-        Buffer: true,
-        global: true,
-        process: true,
-      },
-      protocolImports: true,
-    }),
+    // Remove nodePolyfills plugin entirely and use manual approach
   ],
   // 1. Treat WASM as assets so they get served correctly
   assetsInclude: ['**/*.wasm'],
   
+  define: {
+    // Manual process polyfill
+    'process.env': '{}',
+    'global': 'globalThis',
+  },
+  
+  // Add crypto polyfill for Arcium
   optimizeDeps: {
     // Exclude these so Vite doesn't try to bundle the WASM binaries
     exclude: ['@aztec/bb.js', '@noir-lang/noir_js', '@noir-lang/backend_barretenberg', 'solvrn-sdk'],
-    include: ['@solana/codecs-numbers'],
+    include: ['@solana/codecs-numbers', 'crypto-browserify'],
+    force: true,
     esbuildOptions: {
       target: 'esnext',
     },
@@ -55,6 +55,7 @@ export default defineConfig({
     alias: {
       pino: 'pino/browser.js',
       'solvrn-sdk': 'solvrn-sdk/dist/index.js',
+      'crypto': 'crypto-browserify',
     },
     conditions: ['import', 'module', 'browser', 'default'],
   },

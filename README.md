@@ -38,7 +38,11 @@ The SDK includes a default relayer for development and testing at `https://injur
 const solvrn = new SolvrnClient();
 ```
 
-For production deployments, you can run your own relayer instance to ensure availability and control over the infrastructure and your privacy
+For production deployments, you should run your own relayer instance to ensure availability and control over the infrastructure.
+
+## Live Preview
+
+Check out the live Solvrn frontend at [https://solvrn.vercel.app](https://solvrn.vercel.app) to see private governance in action.
 
 ## Architecture
 
