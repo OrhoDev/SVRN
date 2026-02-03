@@ -52,7 +52,7 @@ See the full API reference at [sdk/README.md](./sdk/README.md).
 
 ## Default Relayer Warning
 
-The SDK includes a temporary default relayer at `https://missed-insulin-infrastructure-vids.trycloudflare.com` for quick testing. This is a Cloudflare tunnel that could change or disappear without notice. Do not use it for production or anything important. A real, reliable relayer will be added soon.
+The SDK includes a temporary default relayer for quick testing. This is a Cloudflare tunnel that could change or disappear without notice. Do not use it for production or anything important. A real, reliable relayer will be added soon.
 
 For production deployments, run your own relayer instance. See the Development section below for setup instructions.
 
@@ -60,7 +60,7 @@ For production deployments, run your own relayer instance. See the Development s
 
 SOLVRN has four main components that work together to enable private voting.
 
-The Solana smart contract stores proposals and encrypted votes while verifying zero-knowledge proofs. The contract never sees plaintext votes or voter identities and is deployed at `AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv`.
+The Solana smart contract stores proposals and encrypted votes while verifying zero-knowledge proofs. The contract never sees plaintext votes or voter identities and is deployed.
 
 The relayer handles off-chain computation including snapshot generation, Merkle tree construction, ballot encryption using Arcium MPC, and proof verification. The relayer coordinates threshold cryptography so no single party can decrypt votes.
 
