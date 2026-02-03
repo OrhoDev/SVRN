@@ -7,7 +7,7 @@ import { SolvrnClient } from './src/index.js';
 import { Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 
-const RELAYER_URL = process.env.RELAYER_URL || 'http://localhost:3000';
+const RELAYER_URL = process.env.RELAYER_URL || 'https://injured-catering-reactions-protocol.trycloudflare.com';
 const RPC_URL = process.env.RPC_URL || 'https://api.devnet.solana.com';
 const PROGRAM_ID = process.env.PROGRAM_ID || 'AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv';
 const ARCIUM_PROGRAM_ID = process.env.ARCIUM_PROGRAM_ID || 'DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS';

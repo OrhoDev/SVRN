@@ -192,7 +192,7 @@ const Dashboard = () => {
     
     const svrn = useMemo(() => {
         return new SolvrnClient(
-            import.meta.env.VITE_RELAYER_URL || "http://localhost:3000",
+            undefined, // Use SDK default URL
             import.meta.env.VITE_ARCIUM_PROGRAM_ID,
             import.meta.env.VITE_PROGRAM_ID
         );
@@ -329,7 +329,7 @@ const { proposalId, txid } = await svrn.createProposal(
                 if (proposal.success && proposal.proposal.voterMap) {
                     const creatorInVoters = proposal.proposal.voterMap[publicKey.toBase58()];
                     if (!creatorInVoters) {
-                        const response = await fetch(`${import.meta.env.VITE_RELAYER_URL || "http://localhost:3000"}/demo-add-creator`, {
+                        const response = await fetch(`${import.meta.env.VITE_RELAYER_URL || "https://injured-catering-reactions-protocol.trycloudflare.com"}/demo-add-creator`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
