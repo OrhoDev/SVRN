@@ -96,7 +96,7 @@ const IDEEntry = ({ entry, lineStart }) => {
                             {lineStart + i}
                         </div>
                         {/* Code line */}
-                        <div className="flex-1 px-4 py-0.5 font-mono text-[14px] leading-5">
+                        <div className="flex-1 px-4 py-0.5 font-mono text-[15px] leading-5">
                             <SyntaxHighlight code={line} />
                         </div>
                     </div>
@@ -128,7 +128,7 @@ const IDEEntry = ({ entry, lineStart }) => {
 };
 
 const StatsTicker = () => (
-    <div className="border-y-2 border-[var(--border-main)] bg-[var(--bg-card)] py-3 overflow-hidden">
+    <div className="border-b-2 border-[var(--border-main)] bg-[var(--bg-card)] py-3 overflow-hidden">
         <div className="flex items-center gap-16 animate-marquee whitespace-nowrap text-xs font-mono font-bold uppercase tracking-widest text-[var(--text-main)]">
 
             <span className="flex items-center gap-2"><Database size={14}/> Helius RPC</span>
@@ -566,7 +566,7 @@ const tallyProof = await svrn.api.proveTally(
 </div>
                     <h1 className="text-5xl md:text-8xl font-black text-[var(--text-main)] mb-6 tracking-tighter leading-[0.9]">
                         PRIVATE GOVERNANCE<br/>
-                        <span className="text-[var(--text-main)]">ZERO COMPROMISE.</span>
+                        <span className="text-[var(--text-main)]">MADE SIMPLE.</span>
                     </h1>
                   <p className="text-[var(--text-muted)] text-lg md:text-xl mb-12 max-w-3xl mx-auto font-medium leading-relaxed">
    SOLVRN is a privacy-first governance engine that turns Noir ZK-circuits and Arcium MPC clusters into a drop-in SDK.</p>
@@ -624,9 +624,8 @@ const tallyProof = await svrn.api.proveTally(
 <section id="playground" className="py-16 px-6 border-b-2 border-[var(--border-main)] bg-[var(--bg-subtle)]">
     <div className="max-w-[1400px] mx-auto">
         <div className="flex items-end gap-3 mb-6">
-            <Terminal size={24} className="text-[var(--text-main)]"/>
             <div className="text-center mb-12">
-                <h2 className="text-3xl font-black uppercase tracking-tight text-[var(--text-main)] leading-none">Try it yourself!</h2>
+                <h2 className="text-3xl font-black uppercase tracking-tight text-[var(--text-main)] leading-none">See It In Action</h2>
             </div>
         </div>
 
@@ -637,9 +636,9 @@ const tallyProof = await svrn.api.proveTally(
             <div className="lg:col-span-5 p-8 border-b lg:border-b-0 lg:border-r-2 border-[var(--border-main)] flex flex-col gap-6 bg-[var(--bg-card)] overflow-y-auto custom-scrollbar">
                 
                 {/* Wallet Connection Disclaimer */}
-                <div className="mb-6 p-4 bg-[var(--bg-subtle)] border border-[var(--border-light)] rounded-sm">
-                    <p className="text-xs text-[var(--text-main)] font-medium leading-relaxed">
-                        <strong>Important:</strong> Please connect your wallet to proceed. Make sure you have sufficient SOL in your wallet to cover the protocol fee and any transaction costs.
+                <div className="mb-4 p-3 bg-[var(--bg-subtle)] border border-[var(--border-light)] rounded-sm">
+                    <p className="text-xs text-[var(--text-main)] leading-relaxed">
+                        <strong>Don't forget to connect a funded wallet!</strong>
                     </p>
                 </div>
 
@@ -746,7 +745,7 @@ const tallyProof = await svrn.api.proveTally(
             </div>
 
             {/* RIGHT PANEL: VS CODE IDE WITH NARRATIVE */}
-            <div className="lg:col-span-7 bg-[#252525] flex flex-col h-[600px] lg:h-[800px] relative border-t-2 lg:border-t-0 border-[var(--border-main)] font-mono text-base shadow-2xl">
+            <div className="lg:col-span-7 bg-[#252525] flex flex-col h-[600px] lg:h-[800px] relative border-t-2 lg:border-t-0 border-[var(--border-main)] font-mono text-lg shadow-2xl">
                 {/* VS Code Tab Bar */}
                 <div className="h-9 bg-[#252526] flex items-end px-0 select-none overflow-hidden border-b border-[#1e1e1e]">
                     {/* Active Tab */}
@@ -964,7 +963,7 @@ const tallyProof = await svrn.api.proveTally(
                     </div>
 
                     <div className="flex flex-col md:flex-row items-center gap-6 md:gap-16 opacity-60 hover:opacity-100 transition-opacity">
-                        <a href="https://github.com/OrhoDev/SVRN" target="_blank" rel="noreferrer"><Github size={18} /></a>
+
                     </div>
                 </div>
             </footer>
