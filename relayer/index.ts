@@ -28,15 +28,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Rate limiting: 100 requests per 2 minutes per IP
 const limiter = rateLimit({
-  windowMs: 2 * 60 * 1000, // 2 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 2 * 60 * 1000,
+  max: 100,
   message: { success: false, error: "Too many requests, please try again later" }
 });
 app.use(limiter);
 
-// --- LOAD TALLY CIRCUIT ---
 const tallyCircuitPath = path.join(__dirname, 'tally.json');
 let tallyCircuit: any;
 try {
@@ -307,11 +305,6 @@ async function getHighestProposalId(): Promise<number> {
     }
 }
 
-// ==========================================
-// 0. NEW: INFO ROUTES (Fixes SDK 404s)
-// ==========================================
-
-// Fixes: "Unexpected token <" when SDK calls getNextProposalId
 app.get('/next-proposal-id', async (req: Request, res: Response) => {
     try {
         // Get highest proposal ID from on-chain accounts
@@ -340,13 +333,12 @@ app.get('/next-proposal-id', async (req: Request, res: Response) => {
 app.post('/admin/reset-proposals', (req: Request, res: Response) => {
     // Clear the snapshot database to reset proposal IDs
     Object.keys(SNAPSHOT_DB).forEach(key => delete SNAPSHOT_DB[key]);
-    console.log("🔄 Proposal database reset - all proposal IDs cleared");
+    console.log("Proposal database reset - all proposal IDs cleared");
     res.json({ success: true, message: "Proposal database reset successfully" });
 });
 
-// Fixes: SDK ability to fetch proposal details
 app.get('/proposal/:id', (req: Request, res: Response) => {
-    const proposalId = req.params.id as string; // Explicitly cast to string
+    const proposalId = req.params.id as string;
     const snap = SNAPSHOT_DB[proposalId];
     
     if (!snap) {
@@ -952,7 +944,6 @@ app.post('/relay-vote', async (req: Request, res: Response) => {
         const [proposalPda] = PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
         const [nullifierPda] = PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
         
-        // Helpful debug prints for explorer verification
         try {
             const nullifierBuf = Buffer.from(nullifier);
             console.log(`Relay Vote - proposal=${proposalId}`);

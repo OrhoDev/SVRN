@@ -489,23 +489,17 @@ const tallyProof = await svrn.api.proveTally(
         finally { setIsLoading(false); }
     };
 
-    // Auto-scroll to bottom when new entries are added (IDE only)
     useEffect(() => {
         const traceElement = document.getElementById('execution-trace');
         if (traceElement && history.length > 0) {
-            // Multiple attempts to ensure scroll works
             const scrollToBottom = () => {
                 traceElement.scrollTop = traceElement.scrollHeight;
             };
             
-            // Immediate scroll
             scrollToBottom();
-            
-            // Delayed scroll (content might need time to render)
             setTimeout(scrollToBottom, 100);
             setTimeout(scrollToBottom, 300);
             
-            // Use requestAnimationFrame for smooth scroll
             requestAnimationFrame(scrollToBottom);
         }
     }, [history]);

@@ -13,11 +13,78 @@ npm install solvrn-sdk
 ```typescript
 import { SolvrnClient } from 'solvrn-sdk';
 
-const solvrn = new SolvrnClient('https://your-relayer.com');
+// Uses default relayer URL automatically
+const solvrn = new SolvrnClient();
 await solvrn.init(circuitJson);
 
 const { proposalId } = await solvrn.createProposal(provider, authority, mint, metadata, 0.05);
 await solvrn.castVote(provider, wallet, proposalId, 1); // 1 = YES
+```
+
+## Default Relayer
+
+The SDK uses a public relayer by default: `https://injured-catering-reactions-protocol.trycloudflare.com`
+
+This relayer is hosted for development and testing purposes. For production use, you should run your own relayer instance.
+
+## Hosting Your Own Relayer
+
+### Prerequisites
+- Node.js 18+
+- Solana CLI
+- Arcium account (for MPC features)
+
+### Setup Instructions
+
+1. **Clone and Build**
+```bash
+git clone https://github.com/OrhoDev/SVRN.git
+cd SVRN/relayer
+npm install
+npm run build
+```
+
+2. **Configure Environment**
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+3. **Generate Relayer Keypair**
+```bash
+solana-keygen new -o relayer-keypair.json
+```
+
+4. **Start the Relayer**
+```bash
+npm start
+```
+
+### Public Access Options
+
+#### Option 1: Cloudflare Tunnel (Recommended)
+```bash
+# Install cloudflared
+wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared-linux-amd64.deb
+
+# Start tunnel
+cloudflared tunnel --url http://localhost:3000
+```
+
+#### Option 2: ngrok
+```bash
+ngrok http 3000
+```
+
+#### Option 3: Cloud Hosting
+Deploy to services like Render, Railway, or GCP with proper domain configuration.
+
+### Using Custom Relayer
+```typescript
+import { SolvrnClient } from 'solvrn-sdk';
+
+const solvrn = new SolvrnClient('https://your-relayer-url.com');
 ```
 
 ## Overview
@@ -58,7 +125,7 @@ Supported wallets include Phantom, Solflare, and other standard Solana wallets.
 
 The voting process follows a strictly defined privacy-preserving pipeline.
 
-1. Eligibility verification is performed using a zero-knowledge proof that demonstrates membership in the eligible voter set without revealing the voter’s identity.
+1. Eligibility verification is performed using a zero-knowledge proof that demonstrates membership in the eligible voter set without revealing the voter's identity.
 2. The vote is encrypted using threshold cryptography coordinated through Arcium MPC, ensuring that no single party can decrypt ballots.
 3. A nullifier is generated to prevent double voting while preserving anonymity.
 4. Vote tallies are computed and verified through a zero-knowledge proof that confirms correctness without revealing individual votes.
@@ -118,6 +185,10 @@ import { SolvrnClient } from 'solvrn-sdk';
 import { AnchorProvider } from '@coral-xyz/anchor';
 import { Connection, PublicKey } from '@solana/web3.js';
 
+// Uses default relayer automatically
+const solvrn = new SolvrnClient();
+
+// Or specify custom relayer
 const solvrn = new SolvrnClient(
   'https://your-relayer.com',  // Relayer URL
   'DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS',  // Arcium Program ID
