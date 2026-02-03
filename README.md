@@ -2,207 +2,125 @@
 
 Solvrn is a private governance protocol for Solana that enables confidential on-chain voting using zero-knowledge proofs and secure multi-party computation.
 
-The protocol addresses a core limitation of decentralized governance systems: the inability to preserve voter privacy while maintaining public verifiability. Solvrn allows participants to vote without revealing identity, voting power, or preferences, while still enforcing eligibility, preventing double voting, and producing a verifiable tally.
+Traditional governance systems can't keep votes private while staying verifiable. Solvrn solves this by allowing participants to vote without revealing their identity, voting power, or preferences while the system enforces eligibility, prevents double voting, and produces a fully verifiable tally.
+
+The protocol supports DAO voting, treasury management, and quadratic voting while keeping all votes private at every stage.
 
 ## Quick Start
 
+Install the SDK from npm.
+
 ```bash
 npm install solvrn-sdk
 ```
 
+Here's how to create a proposal and cast a vote.
+
 ```typescript
 import { SolvrnClient } from 'solvrn-sdk';
 
-// Uses default relayer URL automatically
-const solvrn = new SolvrnClient();
+const solvrn = new SolvrnClient('https://your-relayer.com');
 await solvrn.init(circuitJson);
 
 const { proposalId } = await solvrn.createProposal(provider, authority, mint, metadata, 0.05);
-await solvrn.castVote(provider, wallet, proposalId, 1); // 1 = YES
+await solvrn.castVote(provider, wallet, proposalId, 1); // 1 = YES, 0 = NO
 ```
+
+The SDK handles all cryptographic operations and transaction relaying automatically. You can also use the default relayer by creating the client without a URL.
 
 ## Default Relayer
 
-The SDK uses a public relayer by default: `https://injured-catering-reactions-protocol.trycloudflare.com`
+The SDK includes a default relayer for development and testing at `https://injured-catering-reactions-protocol.trycloudflare.com`
+(URL is subject to change later in development). This allows you to start building immediately without hosting your own relayer.
 
-This relayer is hosted for development and testing purposes. For production use, you should run your own relayer instance.
-
-## Hosting Your Own Relayer
-
-### Prerequisites
-- Node.js 18+
-- Solana CLI
-- Arcium account (for MPC features)
-
-### Setup Instructions
-
-1. **Clone and Build**
-```bash
-git clone https://github.com/OrhoDev/SVRN.git
-cd SVRN/relayer
-npm install
-npm run build
-```
-
-2. **Configure Environment**
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-3. **Generate Relayer Keypair**
-```bash
-solana-keygen new -o relayer-keypair.json
-```
-
-4. **Start the Relayer**
-```bash
-npm start
-```
-
-### Public Access Options
-
-#### Option 1: Cloudflare Tunnel (Recommended)
-```bash
-# Install cloudflared
-wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-sudo dpkg -i cloudflared-linux-amd64.deb
-
-# Start tunnel
-cloudflared tunnel --url http://localhost:3000
-```
-
-#### Option 2: ngrok
-```bash
-ngrok http 3000
-```
-
-#### Option 3: Cloud Hosting
-Deploy to services like Render, Railway, or GCP with proper domain configuration.
-
-### Using Custom Relayer
 ```typescript
-import { SolvrnClient } from 'solvrn-sdk';
-
-const solvrn = new SolvrnClient('https://your-relayer-url.com');
+// Uses default relayer automatically
+const solvrn = new SolvrnClient();
 ```
 
-## Overview
-
-Solvrn combines zero-knowledge proofs for eligibility verification with MPC-based ballot encryption to ensure that voting remains private throughout its entire lifecycle. Votes are recorded on-chain only as encrypted ciphertexts, and results are revealed exclusively through zero-knowledge verified tallies.
-
-The system is designed to support real-world governance use cases such as DAO voting, treasury management, and quadratic voting without leaking sensitive information.
+For production deployments, you can run your own relayer instance to ensure availability and control over the infrastructure and your privacy
 
 ## Architecture
 
-Solvrn is composed of four primary components.
+Solvrn has four main components that work together to enable private voting.
 
-### 1. Solana Smart Contract
+The **Solana smart contract** stores proposals and encrypted votes while verifying zero-knowledge proofs. The contract never sees plaintext votes or voter identities and is deployed at `AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv`.
 
-The on-chain program is responsible for proposal initialization, vote submission, and verification of zero-knowledge proofs. All votes stored on-chain are encrypted, and the contract never observes plaintext votes or voter identities.
+The **relayer** handles off-chain computation including snapshot generation, Merkle tree construction, ballot encryption using Arcium MPC, and proof verification. The relayer coordinates threshold cryptography so no single party can decrypt votes.
 
-Program ID: `AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv`
+The **SDK** abstracts cryptographic operations into a simple API that works with standard Solana tooling like wallet adapters and solana-web3.js. Developers can build governance apps without dealing with the cryptography directly.
 
-### 2. Relayer Middleware
-
-The relayer acts as the off-chain coordination layer for privacy-preserving computation. It handles snapshot generation, MPC-based ballot encryption, proof verification, and transaction relaying.
-
-The relayer integrates Noir circuits compiled to Barretenberg for zk proof generation and Arcium for secure multi-party computation.
-
-### 3. SDK
-
-Solvrn provides a high-level SDK for application developers, abstracting away cryptographic complexity and protocol-specific details.
-
-The SDK supports TypeScript and JavaScript and integrates with standard Solana tooling such as wallet adapters, Anchor providers, and solana-web3.js.
-
-### 4. Frontend Interface
-
-A reference frontend is implemented using React and Vite. It provides a user-facing interface for proposal creation, private voting, and transaction monitoring, while preserving all protocol privacy guarantees.
-
-Supported wallets include Phantom, Solflare, and other standard Solana wallets.
+The **frontend** is a reference implementation that demonstrates the SDK integration. It provides an interface for creating proposals, casting votes, and monitoring transactions. This is primarily a showcase site to demonstrate the SDK capabilities rather than a production-ready application.
 
 ## Privacy Pipeline
 
-The voting process follows a strictly defined privacy-preserving pipeline.
+The voting process follows a strict privacy pipeline that protects voter identity at every step.
 
-1. Eligibility verification is performed using a zero-knowledge proof that demonstrates membership in the eligible voter set without revealing the voter's identity.
-2. The vote is encrypted using threshold cryptography coordinated through Arcium MPC, ensuring that no single party can decrypt ballots.
-3. A nullifier is generated to prevent double voting while preserving anonymity.
-4. Vote tallies are computed and verified through a zero-knowledge proof that confirms correctness without revealing individual votes.
+First, eligibility gets verified using zero-knowledge proofs that confirm membership in the voter set without revealing identity. Then the vote gets encrypted through threshold cryptography coordinated by Arcium MPC, ensuring no single party can decrypt ballots. A nullifier gets generated to prevent double voting while preserving anonymity, and the encrypted vote gets stored on-chain. Finally, the tally gets verified using zero-knowledge proofs that confirm correctness without exposing individual votes.
 
 ## Cryptographic Stack
 
-Solvrn relies on the following cryptographic components:
+The protocol uses several cryptographic tools to ensure privacy and verifiability.
 
-- **Noir**: Zero-knowledge circuit language for eligibility proofs and tally verification
-- **Barretenberg**: High-performance proof generation and verification backend
-- **Arcium**: Secure multi-party computation for ballot encryption
-- **Helius**: High-performance Solana RPC access (optional, can use public RPC)
+**Noir** provides the zero-knowledge circuit language for eligibility proofs and tally verification, while **Barretenberg** handles high-performance proof generation and verification. **Arcium** manages secure multi-party computation for ballot encryption, and **Helius** provides high-performance Solana RPC access (though you can use public endpoints too).
 
-## On-Chain Data Model
+Merkle trees are built from token holder snapshots with quadratic voting weights, supporting governance models where voting power scales with holdings.
 
-Proposals are stored as encrypted metadata along with execution parameters.
-Votes are recorded as encrypted ciphertexts paired with nullifiers.
-Results are revealed only after successful verification of a zero-knowledge tally proof.
+## Technical Details
 
-At no point does the protocol expose voter identities or plaintext ballots on-chain.
+The relayer runs on Node.js with Express and uses several cryptographic backends. It initializes Barretenberg WASM for zero-knowledge proof generation and Noir for circuit compilation while maintaining in-memory databases for snapshots and vote storage.
+
+The relayer integrates with Arcium MPC for threshold cryptography. When a vote gets cast, the system generates a nullifier to prevent double voting, then encrypts the ballot through Arcium's multi-party computation to ensure no single party can decrypt individual votes.
+
+The SDK bundles the default Noir circuit so developers don't need to compile circuits themselves. The client handles proof generation locally using Barretenberg's UltraHonk backend, then sends the proof to the relayer for verification.
+
+On-chain, the Solana program stores only encrypted ciphertexts and nullifiers. The contract verifies zero-knowledge proofs but never sees plaintext votes or voter identities. Merkle trees get built from token holder snapshots with quadratic voting weights, where vote power scales with token holdings.
+
+The system uses rate limiting (100 requests per 2 minutes per IP) and input validation to prevent abuse, with all API endpoints protected by CORS and JSON parsing middleware.
 
 ## Core Features
 
-Private voting is enforced end-to-end, ensuring that voter identity and voting choice remain confidential.
+The protocol provides end-to-end private voting where identity and voting choice stay confidential throughout the process.
 
-Quadratic voting is supported, allowing voting power to scale with token holdings while preserving privacy guarantees.
+Quadratic voting is built into the protocol by default, allowing voting power to scale with token holdings while preserving full privacy. Treasury execution can be triggered on-chain based on verified voting outcomes, enabling trust-minimized governance-controlled fund management.
 
-Treasury execution can be triggered on-chain based on verified voting outcomes, enabling trust-minimized governance-controlled fund management.
+## Current Implementation
 
-Gasless voting is supported through the relayer, allowing users to participate without holding SOL.
+The protocol is fully functional for private governance with one component still in progress.
 
-## Current Status
+The core voting infrastructure is complete. Proposal creation works end-to-end, building real on-chain proposals with Merkle tree snapshots from actual token holders. Vote casting uses real Arcium MPC encryption to store votes on-chain, and nullifiers prevent double voting. Eligibility verification runs through real Noir zero-knowledge circuits that verify voter eligibility without revealing identity. The system maintains accurate, verifiable vote counts with encrypted votes stored in Solana accounts. Tally proof generation produces real zero-knowledge proofs that verify majority thresholds and quorum requirements. All on-chain transactions are verifiable on the blockchain.
 
-Core functionality is production-ready:
-
-- **Proposal Creation**: Creates on-chain proposals with Merkle tree snapshots from token holders
-- **Vote Casting**: Votes encrypted using Arcium MPC and stored on-chain with nullifiers preventing double voting
-- **Eligibility Verification**: Zero-knowledge proofs verify voter eligibility without revealing identity
-- **Vote Storage**: Encrypted votes stored on-chain with accurate vote counts
-- **Tally Proof Generation**: Zero-knowledge proofs verify majority thresholds and quorum requirements
-- **Merkle Trees**: Built from token holder snapshots with quadratic voting weights
-
-**Vote Decryption**: Vote breakdown is currently simulated. Votes are encrypted correctly, but Arcium MPC decryption requires a finalized computation definition on-chain. The MPC integration code is complete and ready.
+Vote decryption is the one piece still being implemented. The `getVoteCounts()` function returns accurate total vote counts, but the yes/no breakdown currently uses simulated values. Votes are encrypted and stored correctly using Arcium MPC, but the full decryption workflow wasn't completed before the hackathon deadline. This doesn't affect the core privacy guarantees since votes remain encrypted throughout.
 
 ## SDK Usage
 
-### Installation
+Install the SDK with npm.
 
 ```bash
 npm install solvrn-sdk
 ```
 
-### Example
+Here's a complete example.
 
 ```typescript
 import { SolvrnClient } from 'solvrn-sdk';
 import { AnchorProvider } from '@coral-xyz/anchor';
 import { Connection, PublicKey } from '@solana/web3.js';
 
-// Uses default relayer automatically
-const solvrn = new SolvrnClient();
-
-// Or specify custom relayer
 const solvrn = new SolvrnClient(
-  'https://your-relayer.com',  // Relayer URL
+  'https://your-relayer.com',
   'DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS',  // Arcium Program ID
   'AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv'   // Solvrn Program ID
 );
 
-await solvrn.init(circuitJson); // Initialize ZK backend
+await solvrn.init(circuitJson);
 
 const { proposalId, txid } = await solvrn.createProposal(
     provider,
     authority,
     votingMint,
     metadata,
-    0.05  // Gas buffer (SOL)
+    0.05  // Gas buffer in SOL
 );
 
 const result = await solvrn.castVote(
@@ -213,69 +131,50 @@ const result = await solvrn.castVote(
 );
 ```
 
-See [SDK Documentation](./sdk/README.md) for full API reference.
+The SDK bundles a default Noir circuit for convenience, but you can also provide your own circuit for custom eligibility requirements. The `solvrn.init()` method accepts either the bundled circuit or a custom circuit definition.
 
-## Technical Details
-
-### Architecture
-
-Solvrn consists of four main components:
-
-1. **Solana Smart Contract**: On-chain program that stores proposals and encrypted votes. Program ID: `AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv`
-
-2. **Relayer Middleware**: Node.js/Express server that handles snapshot generation, Merkle tree construction, proof verification, and transaction relaying. The relayer also handles vote decryption (currently simulated).
-
-3. **SDK**: TypeScript library (`solvrn-sdk`) that abstracts cryptographic operations and provides a simple API for building voting applications.
-
-4. **Frontend**: React/Vite reference implementation showing how to integrate the SDK.
-
-### Cryptographic Stack
-
-- **Noir**: Zero-knowledge circuit language for eligibility proofs and tally verification
-- **Barretenberg**: ZK proof generation backend (UltraHonk)
-- **Arcium**: Secure multi-party computation for ballot encryption (threshold cryptography)
-- **Merkle Trees**: Built from token holder snapshots with quadratic voting weights
-
-### Privacy Pipeline
-
-1. Eligibility verification via ZK proof (proves membership in voter set without revealing identity)
-2. Vote encryption using Arcium MPC (threshold cryptography ensures no single party can decrypt)
-3. Nullifier generation (prevents double voting while preserving anonymity)
-4. On-chain storage (only encrypted ciphertexts are stored)
-5. Tally verification via ZK proof (proves correctness without revealing individual votes)
-
-Note: Vote decryption is currently simulated. Votes are encrypted correctly, but the yes/no breakdown uses simulated values until Arcium MPC decryption is implemented.
-
-## Security Model
-
-Solvrn provides strong privacy guarantees by ensuring that voter identities and voting choices are never revealed on-chain and cannot be correlated through protocol interactions.
-
-Integrity is enforced through nullifiers that prevent double voting, zero-knowledge verified tallies, and immutable on-chain records. All critical state transitions are verifiable and auditable without compromising privacy.
-
-The encryption and ZK proof systems are production-ready. Vote decryption is simulated but doesn't affect privacy guarantees - votes remain encrypted and private.
+See the full API reference at [sdk/README.md](./sdk/README.md).
 
 ## Development
 
-Local development requires Node.js version 18 or higher, the Solana CLI, the Anchor framework, the Noir compiler, and a Rust toolchain.
+Local development requires Node.js 18 or higher, Solana CLI, Anchor framework, Noir compiler, and Rust toolchain. The relayer and contracts can run independently for testing.
 
-The relayer, contracts, and frontend can be run independently for development and testing.
+To get started locally, clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/OrhoDev/SVRN.git
+cd SVRN/relayer
+npm install
+npm run build
+```
+
+Configure your environment variables by copying `.env.example` to `.env` and setting your RPC URL and program IDs. Generate a relayer keypair with `solana-keygen new -o relayer-keypair.json` and start the relayer with `npm start`.
+
+## Security Model
+
+Solvrn ensures that voter identities and voting choices are never revealed on-chain and cannot be correlated through protocol interactions.
+
+Integrity is enforced through nullifiers that prevent double voting, zero-knowledge verified tallies, and immutable on-chain records. All critical state transitions are verifiable and auditable without compromising privacy.
+
+The encryption and ZK proof systems are production-ready. Vote decryption is simulated but this doesn't affect the privacy guarantees since votes remain encrypted and private regardless.
 
 ## Project Structure
 
 ```
 solvrn/
-├── sdk/              # Solvrn SDK (published to npm as solvrn-sdk)
-├── relayer/          # Relayer middleware (Node.js/Express)
-├── frontend/         # React/Vite frontend
+├── sdk/              # Solvrn SDK (npm: solvrn-sdk)
+├── relayer/          # Node.js/Express middleware
+├── frontend/         # Demo frontend
 ├── contracts/        # Solana program (Anchor)
-└── svrn_engine/      # Arcium MPC circuit definitions
+├── svrn_engine/      # Core engine implementation
 ```
 
 ## Links
 
-- **SDK**: https://www.npmjs.com/package/solvrn-sdk
-- **Documentation**: See [sdk/README.md](./sdk/README.md)
+The SDK is available at https://www.npmjs.com/package/solvrn-sdk.
+
+Documentation is available at [sdk/README.md](./sdk/README.md).
 
 ## License
 
-ISC License
+ISC
