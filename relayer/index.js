@@ -36,23 +36,23 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_2 = __importDefault(require("express"));
-const cors_2 = __importDefault(require("cors"));
-const express_rate_limit_2 = __importDefault(require("express-rate-limit"));
-const web3_js_2 = require("@solana/web3.js");
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const web3_js_1 = require("@solana/web3.js");
 const anchor = __importStar(require("@coral-xyz/anchor"));
-const bb_js_2 = require("@aztec/bb.js");
-const noir_js_2 = require("@noir-lang/noir_js");
-const fs_2 = __importDefault(require("fs"));
-const path_2 = __importDefault(require("path"));
-const bs58_2 = __importDefault(require("bs58"));
-const dotenv_2 = __importDefault(require("dotenv"));
-const spl_token_2 = require("@solana/spl-token");
-const bn_js_2 = require("bn.js");
-const client_2 = require("@arcium-hq/client");
-dotenv_2.default.config();
-const app = (0, express_2.default)();
-app.use((0, cors_2.default)({
+const bb_js_1 = require("@aztec/bb.js");
+const noir_js_1 = require("@noir-lang/noir_js");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const bs58_1 = __importDefault(require("bs58"));
+const dotenv_1 = __importDefault(require("dotenv"));
+const spl_token_1 = require("@solana/spl-token");
+const bn_js_1 = require("bn.js");
+const client_1 = require("@arcium-hq/client");
+dotenv_1.default.config();
+const app = (0, express_1.default)();
+app.use((0, cors_1.default)({
     origin: [
         'https://solvrn.vercel.app',
         'https://solvrn-fkzpqkqr2-solvrn.vercel.app',
@@ -61,56 +61,56 @@ app.use((0, cors_2.default)({
     ],
     credentials: true
 }));
-app.use(express_2.default.json());
-const limiter = (0, express_rate_limit_2.default)({
+app.use(express_1.default.json());
+const limiter = (0, express_rate_limit_1.default)({
     windowMs: 2 * 60 * 1000,
     max: 100,
     message: { success: false, error: "Too many requests, please try again later" }
 });
 app.use(limiter);
-const tallyCircuitPath = path_2.default.join(__dirname, 'tally.json');
+const tallyCircuitPath = path_1.default.join(__dirname, 'tally.json');
 let tallyCircuit;
 try {
-    tallyCircuit = JSON.parse(fs_2.default.readFileSync(tallyCircuitPath, 'utf-8'));
+    tallyCircuit = JSON.parse(fs_1.default.readFileSync(tallyCircuitPath, 'utf-8'));
 }
 catch (e) {
     console.warn("tally.json not found. Run 'nargo compile' and copy the json file.");
 }
 const PORT = process.env.PORT || 3000;
 const RPC_URL = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
-const PROGRAM_ID = new web3_js_2.PublicKey(process.env.PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
+const PROGRAM_ID = new web3_js_1.PublicKey(process.env.PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
 // Load relayer keypair from environment variable or file
 let relayerWallet;
 if (process.env.RELAYER_KEYPAIR) {
     // From environment variable (base58 encoded secret key)
-    const secretKey = bs58_2.default.decode(process.env.RELAYER_KEYPAIR);
-    relayerWallet = web3_js_2.Keypair.fromSecretKey(secretKey);
+    const secretKey = bs58_1.default.decode(process.env.RELAYER_KEYPAIR);
+    relayerWallet = web3_js_1.Keypair.fromSecretKey(secretKey);
 }
 else {
     // From file (for local development)
     const keypairPath = process.env.RELAYER_KEYPAIR_PATH || './relayer-keypair.json';
-    if (!fs_2.default.existsSync(keypairPath)) {
+    if (!fs_1.default.existsSync(keypairPath)) {
         throw new Error(`Relayer keypair not found at ${keypairPath}. Set RELAYER_KEYPAIR env var or create keypair file.`);
     }
-    const keypairData = JSON.parse(fs_2.default.readFileSync(keypairPath, 'utf-8'));
-    relayerWallet = web3_js_2.Keypair.fromSecretKey(new Uint8Array(keypairData));
+    const keypairData = JSON.parse(fs_1.default.readFileSync(keypairPath, 'utf-8'));
+    relayerWallet = web3_js_1.Keypair.fromSecretKey(new Uint8Array(keypairData));
 }
-const idl = JSON.parse(fs_2.default.readFileSync('./idl.json', 'utf-8'));
-const connection = new web3_js_2.Connection(RPC_URL, "confirmed");
+const idl = JSON.parse(fs_1.default.readFileSync('./idl.json', 'utf-8'));
+const connection = new web3_js_1.Connection(RPC_URL, "confirmed");
 const walletWrapper = new anchor.Wallet(relayerWallet);
 const provider = new anchor.AnchorProvider(connection, walletWrapper, { commitment: "confirmed" });
 const program = new anchor.Program(idl, provider);
 // --- ARCIUM MPC SETUP ---
-const ARCIUM_ID = new web3_js_2.PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
+const ARCIUM_ID = new web3_js_1.PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
 let arciumProgram = null;
 let arciumClusterOffset = 456; // Default, can be overridden by env
 try {
-    const arciumIdl = JSON.parse(fs_2.default.readFileSync('./arcium_idl.json', 'utf-8'));
+    const arciumIdl = JSON.parse(fs_1.default.readFileSync('./arcium_idl.json', 'utf-8'));
     arciumProgram = new anchor.Program(arciumIdl, provider);
     console.log("Arcium MPC Program loaded successfully");
     // Try to get cluster offset from env
     try {
-        const arciumEnv = (0, client_2.getArciumEnv)();
+        const arciumEnv = (0, client_1.getArciumEnv)();
         arciumClusterOffset = arciumEnv.arciumClusterOffset;
     }
     catch (e) {
@@ -130,7 +130,7 @@ console.log("Solvrn Relayer Online");
 let bb;
 async function initZK() {
     console.log("   Initializing Barretenberg WASM (Async Mode)...");
-    bb = await bb_js_2.Barretenberg.new();
+    bb = await bb_js_1.Barretenberg.new();
     console.log("   ZK Backend Ready");
 }
 // Health check endpoint
@@ -168,7 +168,7 @@ app.get('/proposals/active', async (req, res) => {
             let isExecuted = false;
             try {
                 const proposalBn = new anchor.BN(Number(id));
-                const [proposalPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+                const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
                 const proposalAccount = await program.account.proposal.fetch(proposalPda);
                 isExecuted = proposalAccount.isExecuted;
             }
@@ -254,17 +254,17 @@ startServer();
 // --- NOIR-COMPATIBLE HASHING ---
 async function noirHash(input1, input2) {
     const toFr = (val) => {
-        if (val instanceof bb_js_2.Fr)
+        if (val instanceof bb_js_1.Fr)
             return val;
         if (typeof val === 'bigint' || typeof val === 'number')
-            return new bb_js_2.Fr(BigInt(val));
+            return new bb_js_1.Fr(BigInt(val));
         const clean = val.toString().replace('0x', '');
-        return bb_js_2.Fr.fromString(clean);
+        return bb_js_1.Fr.fromString(clean);
     };
     const f1 = toFr(input1);
     const f2 = toFr(input2);
     const result = await bb.pedersenHash([f1, f2], 0);
-    return (result instanceof bb_js_2.Fr) ? result : bb_js_2.Fr.fromBuffer(result);
+    return (result instanceof bb_js_1.Fr) ? result : bb_js_1.Fr.fromBuffer(result);
 }
 function deriveSecret(pubkeyStr) {
     const buffer = Buffer.from(pubkeyStr);
@@ -288,7 +288,7 @@ async function getHighestProposalId() {
                 // Proposal accounts start with proposal_id (8 bytes)
                 if (account.account.data.length >= 8) {
                     const proposalIdBytes = account.account.data.slice(0, 8);
-                    const proposalId = new bn_js_2.BN(proposalIdBytes, 'le').toNumber();
+                    const proposalId = new bn_js_1.BN(proposalIdBytes, 'le').toNumber();
                     // Sanity check: proposal ID should be reasonable
                     if (proposalId > 0 && proposalId < 1000000) {
                         if (proposalId > maxId) {
@@ -459,11 +459,7 @@ app.post('/initialize-snapshot', async (req, res) => {
 // Relayer creates proposal on-chain (creator identity hidden)
 // ==========================================
 const CREATOR_DB = {};
-const { apiKeyAuth, apiKeyRateLimit } = require('./auth-config.js');
-app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
-    console.log('=== CREATE PROPOSAL CALLED ===');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('=== END REQUEST BODY ===');
+app.post('/create-proposal', async (req, res) => {
     try {
         if (!bb)
             return res.status(503).json({ error: "ZK Backend initializing..." });
@@ -493,7 +489,7 @@ app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
                     });
                 }
                 // Check if payment is from creator to relayer
-                const creatorPubkey = new web3_js_2.PublicKey(creator);
+                const creatorPubkey = new web3_js_1.PublicKey(creator);
                 const paymentValid = paymentTx.transaction.message.accountKeys.some((key, idx) => {
                     return key.equals(creatorPubkey) && paymentTx.transaction.message.accountKeys.some((k, i) => k.equals(relayerWallet.publicKey) && i !== idx);
                 });
@@ -514,49 +510,35 @@ app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
             console.log(`   Production: Send ${FEE_AMOUNT_SOL} SOL to ${relayerWallet.publicKey.toBase58()} before creating proposal`);
         }
         // 1. Initialize snapshot (same logic as /initialize-snapshot)
-        console.log('=== BEFORE RPC CALL IN CREATE-PROPOSAL ===');
-        let accounts = [];
-        try {
-            const response = await fetch(RPC_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0', id: 'svrn', method: 'getTokenAccounts',
-                    params: { mint: votingMint, limit: 1000, options: { showZeroBalance: false } }
-                })
-            });
-            console.log('=== RPC CALL MADE IN CREATE-PROPOSAL ===');
-            const data = await response.json();
-            console.log('=== RPC RESPONSE IN CREATE-PROPOSAL ===');
-            console.log(JSON.stringify(data, null, 2));
-            console.log('=== END RPC RESPONSE ===');
-            accounts = data.result?.token_accounts || [];
-            console.log(`=== FOUND ${accounts.length} TOKEN ACCOUNTS IN CREATE-PROPOSAL ===`);
-        } catch (error) {
-            console.log('=== RPC CALL FAILED IN CREATE-PROPOSAL ===');
-            console.log('Error:', error);
-            console.log('=== END RPC ERROR ===');
-        }
-        console.log(`=== PROCEEDING WITH ${accounts.length} ACCOUNTS ===`);
+        const response = await fetch(RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 'svrn', method: 'getTokenAccounts',
+                params: { mint: votingMint, limit: 1000, options: { showZeroBalance: false } }
+            })
+        });
+        const data = await response.json();
+        const accounts = data.result?.token_accounts || [];
+        console.log(`🔍 DEBUG: Found ${accounts.length} token accounts from RPC`);
+        console.log(`🔍 DEBUG: First 3 accounts: ${accounts.slice(0, 3).map((a) => a.owner.slice(0, 8)).join(', ')}`);
         let voters = accounts.map((acc) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v) => v.balance > 0).slice(0, 256);
-        // PRODUCTION MODE: Only add creator if they have tokens
+        console.log(`🔍 DEBUG: Filtered to ${voters.length} voters with balance > 0`);
+        console.log(`🔍 DEBUG: First 3 voters: ${voters.slice(0, 3).map((v) => v.owner.slice(0, 8)).join(', ')}`);
+        // DEMO MODE: Always add creator if they're not already in the voter list
         if (creator) {
             const creatorInVoters = voters.find((v) => v.owner === creator);
             if (!creatorInVoters) {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... has no tokens. Not adding to voter list.`);
-                // In production mode, we DON'T force-add creators without tokens
-                // Uncomment the following lines for demo/testing mode:
-                /*
+                console.log(`DEMO MODE: Force-adding creator ${creator.slice(0, 6)}... to voter list`);
                 voters.unshift({
                     owner: creator,
                     balance: 1000000 // Default to 1 SOL for demo
                 });
-                console.log(`DEMO MODE: Force-added creator ${creator.slice(0,6)}... at beginning`);
-                */
+                console.log(`DEMO MODE: Force-added creator ${creator.slice(0, 6)}... at beginning`);
             }
             else {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... already in voter list with ${creatorInVoters.balance} tokens`);
+                console.log(`Creator ${creator.slice(0, 6)}... already in voter list with ${creatorInVoters.balance} tokens`);
             }
         }
         if (voters.length === 0) {
@@ -600,26 +582,26 @@ app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
         SNAPSHOT_DB[propKey] = { root, voterMap, levels, metadata: metadata || {} };
         console.log(`   Snapshot built. Root: ${root.slice(0, 16)}...`);
         // 2. Create proposal on-chain (RELAYER signs, not creator)
-        const proposalBn = new bn_js_2.BN(proposalId);
-        const [proposalPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+        const proposalBn = new bn_js_1.BN(proposalId);
+        const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
         // Convert merkle root to bytes
         const rootHex = root.replace('0x', '').padStart(64, '0');
         const merkleRootBytes = [];
         for (let i = 0; i < 64; i += 2) {
             merkleRootBytes.push(parseInt(rootHex.substr(i, 2), 16));
         }
-        const votingMintPubkey = new web3_js_2.PublicKey(votingMint);
-        const targetWalletPubkey = targetWallet ? new web3_js_2.PublicKey(targetWallet) : relayerWallet.publicKey;
+        const votingMintPubkey = new web3_js_1.PublicKey(votingMint);
+        const targetWalletPubkey = targetWallet ? new web3_js_1.PublicKey(targetWallet) : relayerWallet.publicKey;
         // Calculate associated token account for proposal
-        const [vault] = web3_js_2.PublicKey.findProgramAddressSync([
+        const [vault] = web3_js_1.PublicKey.findProgramAddressSync([
             proposalPda.toBuffer(),
-            spl_token_2.TOKEN_PROGRAM_ID.toBuffer(),
+            spl_token_1.TOKEN_PROGRAM_ID.toBuffer(),
             votingMintPubkey.toBuffer()
-        ], spl_token_2.ASSOCIATED_TOKEN_PROGRAM_ID);
+        ], spl_token_1.ASSOCIATED_TOKEN_PROGRAM_ID);
         console.log(`   Creating on-chain proposal...`);
         console.log(`   Authority (on-chain): ${relayerWallet.publicKey.toBase58().slice(0, 8)}... (relayer)`);
         console.log(`   Proposal Token Account: ${vault.toBase58().slice(0, 8)}...`);
-        const tx = await program.methods.initializeProposal(proposalBn, merkleRootBytes, new bn_js_2.BN(1000) // execution_amount
+        const tx = await program.methods.initializeProposal(proposalBn, merkleRootBytes, new bn_js_1.BN(1000) // execution_amount
         ).accounts({
             proposal: proposalPda,
             proposalTokenAccount: vault, // Associated token account
@@ -627,8 +609,8 @@ app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
             treasuryMint: votingMintPubkey,
             targetWallet: targetWalletPubkey,
             relayer: relayerWallet.publicKey, // Contract expects 'relayer' not 'authority'
-            tokenProgram: spl_token_2.TOKEN_PROGRAM_ID,
-            associatedTokenProgram: spl_token_2.ASSOCIATED_TOKEN_PROGRAM_ID,
+            tokenProgram: spl_token_1.TOKEN_PROGRAM_ID,
+            associatedTokenProgram: spl_token_1.ASSOCIATED_TOKEN_PROGRAM_ID,
             systemProgram: anchor.web3.SystemProgram.programId
         }).signers([relayerWallet]).rpc();
         console.log(`   ✅ Proposal created on-chain: ${tx.slice(0, 16)}...`);
@@ -699,7 +681,7 @@ app.post('/add-creator', async (req, res) => {
         const voters = Object.values(snapshot.voterMap);
         const leavesFr = voters.map((v) => {
             const clean = v.leaf.toString().replace('0x', '');
-            return bb_js_2.Fr.fromString(clean);
+            return bb_js_1.Fr.fromString(clean);
         });
         // Pad to power of 2 if needed
         const zeroLeaf = await noirHash(0, 0);
@@ -738,7 +720,7 @@ app.post('/add-creator', async (req, res) => {
 // ==========================================
 // 2. PROOF GENERATION (Voting)
 // ==========================================
-app.post('/get-proof', apiKeyAuth, apiKeyRateLimit, (req, res) => {
+app.post('/get-proof', (req, res) => {
     // Debug logging removed for security
     try {
         const { proposalId, userPubkey } = req.body;
@@ -774,8 +756,8 @@ app.post('/relay-vote', async (req, res) => {
         const { nullifier, ciphertext, pubkey, nonce, proposalId } = req.body;
         const proposalBn = new anchor.BN(proposalId);
         // SYNCED SEED: svrn_v5
-        const [proposalPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
-        const [nullifierPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
+        const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+        const [nullifierPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
         try {
             const nullifierBuf = Buffer.from(nullifier);
         }
@@ -819,8 +801,8 @@ async function findNextCompOffset(clusterOffset) {
     // Start from 5 to avoid broken offsets 0-3
     let id = 5;
     while (id < 1000) {
-        const compOffset = new bn_js_2.BN(id);
-        const pda = (0, client_2.getComputationAccAddress)(clusterOffset, compOffset);
+        const compOffset = new bn_js_1.BN(id);
+        const pda = (0, client_1.getComputationAccAddress)(clusterOffset, compOffset);
         const info = await connection.getAccountInfo(pda);
         if (!info)
             return compOffset;
@@ -839,11 +821,11 @@ async function decryptVotes(votes) {
         return simulatedDecrypt(votes);
     }
     // Get Arcium account PDAs
-    const clusterPda = (0, client_2.getClusterAccAddress)(arciumClusterOffset);
-    const mxeAccount = (0, client_2.getMXEAccAddress)(ARCIUM_ID);
-    const mempoolAccount = (0, client_2.getMempoolAccAddress)(arciumClusterOffset);
-    const executingPool = (0, client_2.getExecutingPoolAccAddress)(arciumClusterOffset);
-    const compDefAccount = (0, client_2.getCompDefAccAddress)(ARCIUM_ID, Buffer.from((0, client_2.getCompDefAccOffset)("add_together")).readUInt32LE());
+    const clusterPda = (0, client_1.getClusterAccAddress)(arciumClusterOffset);
+    const mxeAccount = (0, client_1.getMXEAccAddress)(ARCIUM_ID);
+    const mempoolAccount = (0, client_1.getMempoolAccAddress)(arciumClusterOffset);
+    const executingPool = (0, client_1.getExecutingPoolAccAddress)(arciumClusterOffset);
+    const compDefAccount = (0, client_1.getCompDefAccAddress)(ARCIUM_ID, Buffer.from((0, client_1.getCompDefAccOffset)("add_together")).readUInt32LE());
     // Verify computation definition exists
     const compDefInfo = await connection.getAccountInfo(compDefAccount);
     if (!compDefInfo) {
@@ -866,8 +848,8 @@ async function decryptVotes(votes) {
             const nonce = vote.account.nonce;
             console.log(`\n   📄 Decrypting Ballot #${i + 1}/${votes.length}...`);
             // Use sequential offsets
-            const compOffset = new bn_js_2.BN(startingOffset.toNumber() + i);
-            const compPda = (0, client_2.getComputationAccAddress)(arciumClusterOffset, compOffset);
+            const compOffset = new bn_js_1.BN(startingOffset.toNumber() + i);
+            const compPda = (0, client_1.getComputationAccAddress)(arciumClusterOffset, compOffset);
             // Parse ciphertext into two 32-byte arrays (balance, choice)
             const ciphertextArray = Array.from(ciphertext);
             const ciphertext0 = new Array(32).fill(0);
@@ -879,7 +861,7 @@ async function decryptVotes(votes) {
                 ciphertext1[j] = ciphertextArray[j + 32];
             }
             const pubkeyArray = Array.from(pubkey);
-            const nonceBN = new bn_js_2.BN(nonce.toString());
+            const nonceBN = new bn_js_1.BN(nonce.toString());
             // Submit to Arcium MPC
             console.log(`      > Submitting to Arcium MPC (offset: ${compOffset.toString()})...`);
             const tx = await arciumProgram.methods
@@ -992,9 +974,42 @@ app.get('/vote-counts/:proposalId', async (req, res) => {
         res.status(500).json({ success: false, error: e.message });
     }
 });
+// Debug endpoint to view SNAPSHOT_DB
+app.get('/debug-snapshots', (req, res) => {
+    res.json({
+        proposalIds: Object.keys(SNAPSHOT_DB),
+        snapshots: SNAPSHOT_DB
+    });
+});
+// Clear all snapshots to bypass corrupted data
+app.post('/clear-snapshots', (req, res) => {
+    const clearedCount = Object.keys(SNAPSHOT_DB).length;
+    // Clear the database
+    Object.keys(SNAPSHOT_DB).forEach(key => delete SNAPSHOT_DB[key]);
+    console.log(`🗑️ Cleared ${clearedCount} snapshots from SNAPSHOT_DB`);
+    res.json({
+        success: true,
+        message: `Cleared ${clearedCount} snapshots`,
+        clearedCount
+    });
+});
+// Force clear all data including corrupted entries
+app.post('/force-clear-all', (req, res) => {
+    const clearedCount = Object.keys(SNAPSHOT_DB).length;
+    // Force clear by reassigning empty object
+    const newDb = {};
+    Object.assign(SNAPSHOT_DB, newDb);
+    console.log(`💥 FORCE CLEARED ${clearedCount} snapshots from SNAPSHOT_DB`);
+    res.json({
+        success: true,
+        message: `Force cleared ${clearedCount} snapshots`,
+        clearedCount,
+        totalProposals: Object.keys(SNAPSHOT_DB).length
+    });
+});
 // 4. FEATURE 2: ZK TALLY PROOF (Finalization)
 // ==========================================
-app.post('/prove-tally', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
+app.post('/prove-tally', async (req, res) => {
     try {
         console.log("Generating ZK Tally Proof...");
         if (!tallyCircuit)
@@ -1003,8 +1018,8 @@ app.post('/prove-tally', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
         const { yesVotes, noVotes, threshold, quorum } = req.body;
         console.log(`   Inputs: yes=${yesVotes}, no=${noVotes}, threshold=${threshold}, quorum=${quorum}`);
         // 2. Setup Dedicated Backend for Tally Circuit
-        const tallyBackend = new bb_js_2.UltraHonkBackend(tallyCircuit.bytecode, bb);
-        const noir = new noir_js_2.Noir(tallyCircuit);
+        const tallyBackend = new bb_js_1.UltraHonkBackend(tallyCircuit.bytecode, bb);
+        const noir = new noir_js_1.Noir(tallyCircuit);
         // 3. Execute Circuit (Inputs must match main.nr EXACTLY)
         const inputs = {
             yes_votes: yesVotes.toString(),

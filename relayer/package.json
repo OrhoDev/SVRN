@@ -26,7 +26,7 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "start": "node index.js",
+    "start": "ts-node index.ts",
     "build": "tsc",
     "dev": "nodemon --exec ts-node index.ts"
   }

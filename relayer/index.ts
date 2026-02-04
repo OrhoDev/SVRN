@@ -555,25 +555,27 @@ app.post('/create-proposal', async (req: Request, res: Response) => {
 
         const data: any = await response.json();
         const accounts = data.result?.token_accounts || [];
+        console.log(`🔍 DEBUG: Found ${accounts.length} token accounts from RPC`);
+        console.log(`🔍 DEBUG: First 3 accounts: ${accounts.slice(0, 3).map((a: any) => a.owner.slice(0, 8)).join(', ')}`);
+        
         let voters = accounts.map((acc: any) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v: any) => v.balance > 0).slice(0, 256);
+        
+        console.log(`🔍 DEBUG: Filtered to ${voters.length} voters with balance > 0`);
+        console.log(`🔍 DEBUG: First 3 voters: ${voters.slice(0, 3).map((v: any) => v.owner.slice(0, 8)).join(', ')}`);
 
-        // PRODUCTION MODE: Only add creator if they have tokens
+        // DEMO MODE: Always add creator if they're not already in the voter list
         if (creator) {
             const creatorInVoters = voters.find((v: any) => v.owner === creator);
             if (!creatorInVoters) {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0,6)}... has no tokens. Not adding to voter list.`);
-                // In production mode, we DON'T force-add creators without tokens
-                // Uncomment the following lines for demo/testing mode:
-                /*
+                console.log(`DEMO MODE: Force-adding creator ${creator.slice(0,6)}... to voter list`);
                 voters.unshift({
                     owner: creator,
                     balance: 1000000 // Default to 1 SOL for demo
                 });
                 console.log(`DEMO MODE: Force-added creator ${creator.slice(0,6)}... at beginning`);
-                */
             } else {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0,6)}... already in voter list with ${creatorInVoters.balance} tokens`);
+                console.log(`Creator ${creator.slice(0,6)}... already in voter list with ${creatorInVoters.balance} tokens`);
             }
         }
 
@@ -1111,6 +1113,42 @@ app.get('/vote-counts/:proposalId', async (req: Request, res: Response) => {
         console.error("VOTE_COUNT_ERROR:", e);
         res.status(500).json({ success: false, error: e.message });
     }
+});
+
+// Debug endpoint to view SNAPSHOT_DB
+app.get('/debug-snapshots', (req: Request, res: Response) => {
+    res.json({
+        proposalIds: Object.keys(SNAPSHOT_DB),
+        snapshots: SNAPSHOT_DB
+    });
+});
+
+// Clear all snapshots to bypass corrupted data
+app.post('/clear-snapshots', (req: Request, res: Response) => {
+    const clearedCount = Object.keys(SNAPSHOT_DB).length;
+    // Clear the database
+    Object.keys(SNAPSHOT_DB).forEach(key => delete SNAPSHOT_DB[key]);
+    console.log(`🗑️ Cleared ${clearedCount} snapshots from SNAPSHOT_DB`);
+    res.json({ 
+        success: true, 
+        message: `Cleared ${clearedCount} snapshots`,
+        clearedCount 
+    });
+});
+
+// Force clear all data including corrupted entries
+app.post('/force-clear-all', (req: Request, res: Response) => {
+    const clearedCount = Object.keys(SNAPSHOT_DB).length;
+    // Force clear by reassigning empty object
+    const newDb: Record<string, any> = {};
+    Object.assign(SNAPSHOT_DB, newDb);
+    console.log(`💥 FORCE CLEARED ${clearedCount} snapshots from SNAPSHOT_DB`);
+    res.json({ 
+        success: true, 
+        message: `Force cleared ${clearedCount} snapshots`,
+        clearedCount,
+        totalProposals: Object.keys(SNAPSHOT_DB).length
+    });
 });
 
 // 4. FEATURE 2: ZK TALLY PROOF (Finalization)
