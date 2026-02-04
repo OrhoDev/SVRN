@@ -114,8 +114,15 @@ async function initZK() {
     console.log("   ZK Backend Ready");
 }
 
-// Health check endpoint
+// Health check endpoint (with API key test)
 app.get('/health', (req: Request, res: Response) => {
+    const apiKey = req.headers['x-api-key'] as string;
+    const validApiKey = process.env.RELAYER_API_KEY || '8420e97447a4c5166c263cbe6746af8ebee46497ba93f3509074726f726d41a5';
+    
+    if (apiKey !== validApiKey) {
+        return res.status(401).json({ success: false, error: 'Invalid API key' });
+    }
+    
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -355,6 +362,14 @@ app.get('/proposal/:id', (req: Request, res: Response) => {
 
 app.post('/initialize-snapshot', async (req: Request, res: Response) => {
     try {
+        // API Key Validation
+        const apiKey = req.headers['x-api-key'] as string;
+        const validApiKey = process.env.RELAYER_API_KEY || '8420e97447a4c5166c263cbe6746af8ebee46497ba93f3509074726f726d41a5';
+        
+        if (apiKey !== validApiKey) {
+            return res.status(401).json({ success: false, error: 'Invalid API key' });
+        }
+        
         if (!bb) return res.status(503).json({ error: "ZK Backend initializing..." });
         
         // UPDATED: Now destructuring metadata and creator only
@@ -492,6 +507,14 @@ const CREATOR_DB: Record<string, { creator: string, createdAt: number }> = {};
 
 app.post('/create-proposal', async (req: Request, res: Response) => {
     try {
+        // API Key Validation
+        const apiKey = req.headers['x-api-key'] as string;
+        const validApiKey = process.env.RELAYER_API_KEY || '8420e97447a4c5166c263cbe6746af8ebee46497ba93f3509074726f726d41a5';
+        
+        if (apiKey !== validApiKey) {
+            return res.status(401).json({ success: false, error: 'Invalid API key' });
+        }
+        
         if (!bb) return res.status(503).json({ error: "ZK Backend initializing..." });
         
         const { votingMint, proposalId, metadata, creator, targetWallet, paymentSignature } = req.body;
@@ -802,6 +825,14 @@ app.post('/add-creator', async (req: Request, res: Response) => {
 // ==========================================
 
 app.post('/get-proof', (req: Request, res: Response) => {
+    // API Key Validation
+    const apiKey = req.headers['x-api-key'] as string;
+    const validApiKey = process.env.RELAYER_API_KEY || '8420e97447a4c5166c263cbe6746af8ebee46497ba93f3509074726f726d41a5';
+    
+    if (apiKey !== validApiKey) {
+        return res.status(401).json({ success: false, error: 'Invalid API key' });
+    }
+    
     // Debug logging removed for security
     
     try {
@@ -841,6 +872,14 @@ app.post('/get-proof', (req: Request, res: Response) => {
 
 app.post('/relay-vote', async (req: Request, res: Response) => {
     try {
+        // API Key Validation
+        const apiKey = req.headers['x-api-key'] as string;
+        const validApiKey = process.env.RELAYER_API_KEY || '8420e97447a4c5166c263cbe6746af8ebee46497ba93f3509074726f726d41a5';
+        
+        if (apiKey !== validApiKey) {
+            return res.status(401).json({ success: false, error: 'Invalid API key' });
+        }
+        
         const { nullifier, ciphertext, pubkey, nonce, proposalId } = req.body;
         
         const proposalBn = new anchor.BN(proposalId);
@@ -1156,6 +1195,14 @@ app.post('/force-clear-all', (req: Request, res: Response) => {
 
 app.post('/prove-tally', async (req: Request, res: Response) => {
     try {
+        // API Key Validation
+        const apiKey = req.headers['x-api-key'] as string;
+        const validApiKey = process.env.RELAYER_API_KEY || '8420e97447a4c5166c263cbe6746af8ebee46497ba93f3509074726f726d41a5';
+        
+        if (apiKey !== validApiKey) {
+            return res.status(401).json({ success: false, error: 'Invalid API key' });
+        }
+        
         console.log("Generating ZK Tally Proof...");
         
         if (!tallyCircuit) throw new Error("Tally Circuit JSON not found.");
