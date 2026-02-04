@@ -9,7 +9,7 @@ Traditional governance systems can't keep votes private while staying verifiable
 
 The protocol supports DAO voting, treasury management, and quadratic voting while keeping all votes private at every stage.
 
-**Early Development:** SOLVRN is still in active development. The protocol works but is being refined. The live preview at [solvrn.vercel.app](https://solvrn.vercel.app) is a development demo that showcases capabilities.
+**Early Development:** SOLVRN is still in active development. The protocol works but is being refined.
 
 ## Quick Start
 
@@ -19,7 +19,7 @@ Install the SDK from npm.
 npm install solvrn-sdk
 ```
 
-Basic example using the default relayer.
+Basic example using a custom relayer.
 
 ```typescript
 import { SolvrnClient } from 'solvrn-sdk';
@@ -148,7 +148,6 @@ solvrn/
 
 - SDK: [npmjs.com/package/solvrn-sdk](https://www.npmjs.com/package/solvrn-sdk)
 - Documentation: [sdk/README.md](./sdk/README.md)
-- Live Demo: [solvrn.vercel.app](https://solvrn.vercel.app) 
 - Repository: [github.com/OrhoDev/SVRN](https://github.com/OrhoDev/SVRN)
 
 ## License
