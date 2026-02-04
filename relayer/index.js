@@ -52,16 +52,22 @@ const bn_js_1 = require("bn.js");
 const client_1 = require("@arcium-hq/client");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    origin: [
+        'https://solvrn.vercel.app',
+        'https://solvrn-fkzpqkqr2-solvrn.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:5173'
+    ],
+    credentials: true
+}));
 app.use(express_1.default.json());
-// Rate limiting: 100 requests per 2 minutes per IP
 const limiter = (0, express_rate_limit_1.default)({
-    windowMs: 2 * 60 * 1000, // 2 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    windowMs: 2 * 60 * 1000,
+    max: 100,
     message: { success: false, error: "Too many requests, please try again later" }
 });
 app.use(limiter);
-// --- LOAD TALLY CIRCUIT ---
 const tallyCircuitPath = path_1.default.join(__dirname, 'tally.json');
 let tallyCircuit;
 try {
@@ -325,13 +331,7 @@ app.get('/next-proposal-id', async (req, res) => {
         res.json({ success: true, nextId });
     }
 });
-// Admin endpoint to reset proposal ID counter
-app.post('/admin/reset-proposals', (req, res) => {
-    // Clear the snapshot database to reset proposal IDs
-    Object.keys(SNAPSHOT_DB).forEach(key => delete SNAPSHOT_DB[key]);
-    console.log("🔄 Proposal database reset - all proposal IDs cleared");
-    res.json({ success: true, message: "Proposal database reset successfully" });
-});
+// Admin endpoint removed for security
 app.get('/proposal/:id', (req, res) => {
     const proposalId = req.params.id;
     const snap = SNAPSHOT_DB[proposalId];
@@ -716,108 +716,31 @@ app.post('/add-creator', async (req, res) => {
         res.status(500).json({ success: false, error: e.message });
     }
 });
-// --- DEMO ENDPOINT: Add creator with 1 token (for testing only) ---
-app.post('/demo-add-creator', async (req, res) => {
-    try {
-        const { proposalId, creator } = req.body;
-        const propKey = proposalId.toString();
-        if (!SNAPSHOT_DB[propKey]) {
-            return res.status(404).json({ success: false, error: "Proposal not found" });
-        }
-        const snapshot = SNAPSHOT_DB[propKey];
-        const creatorInVoters = snapshot.voterMap[creator];
-        if (creatorInVoters) {
-            return res.json({ success: true, message: "Creator already in voting tree" });
-        }
-        console.log(`🔧 DEMO: Adding creator ${creator.slice(0, 6)}... with 1 token for testing`);
-        // Add creator with minimum balance (1 token) for voting rights
-        const secretVal = deriveSecret(creator);
-        const weight = 1; // sqrt(1) = 1
-        const leaf = await noirHash(secretVal, weight);
-        // Add to voterMap
-        const creatorIndex = Object.keys(snapshot.voterMap).length;
-        snapshot.voterMap[creator] = {
-            index: creatorIndex,
-            balance: 1,
-            weight: weight,
-            secret: "0x" + secretVal.toString(16).padStart(64, '0'),
-            leaf: leaf.toString()
-        };
-        // REBUILD THE MERKLE TREE with the new leaf
-        const voters = Object.values(snapshot.voterMap);
-        const leavesFr = voters.map((v) => {
-            const clean = v.leaf.toString().replace('0x', '');
-            return bb_js_1.Fr.fromString(clean);
-        });
-        // Pad to power of 2 if needed
-        const zeroLeaf = await noirHash(0, 0);
-        let targetSize = 1;
-        while (targetSize < leavesFr.length)
-            targetSize *= 2;
-        while (leavesFr.length < targetSize)
-            leavesFr.push(zeroLeaf);
-        // Rebuild levels
-        const levels = [leavesFr.map(f => f.toString())];
-        let currentLevel = leavesFr;
-        while (currentLevel.length > 1) {
-            const nextLevelFr = [];
-            for (let i = 0; i < currentLevel.length; i += 2) {
-                const left = currentLevel[i];
-                const right = (i + 1 < currentLevel.length) ? currentLevel[i + 1] : currentLevel[i];
-                const parent = await noirHash(left, right);
-                nextLevelFr.push(parent);
-            }
-            currentLevel = nextLevelFr;
-            levels.push(currentLevel.map(f => f.toString()));
-        }
-        // Update the snapshot with new tree
-        const newRoot = levels[levels.length - 1][0];
-        snapshot.root = newRoot;
-        snapshot.levels = levels;
-        console.log(`🔧 DEMO: Rebuilt tree. New root: ${newRoot.slice(0, 16)}...`);
-        res.json({ success: true, message: "Creator added with 1 token (demo mode)", root: newRoot });
-    }
-    catch (e) {
-        console.error("DEMO_ADD_CREATOR_ERROR:", e.message);
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
+// Demo endpoint removed for security
 // ==========================================
 // 2. PROOF GENERATION (Voting)
 // ==========================================
 app.post('/get-proof', (req, res) => {
-    console.log("=== GET-PROOF DEBUG ===");
-    console.log("Request body:", JSON.stringify(req.body, null, 2));
-    console.log("Available proposals in SNAPSHOT_DB:", Object.keys(SNAPSHOT_DB));
+    // Debug logging removed for security
     try {
         const { proposalId, userPubkey } = req.body;
         const snap = SNAPSHOT_DB[proposalId.toString()];
-        console.log(`Looking for proposal ${proposalId} in SNAPSHOT_DB...`);
-        console.log(`Found snapshot:`, snap ? 'YES' : 'NO');
         if (!snap) {
-            console.log("ERROR: Snapshot not found for proposal", proposalId);
-            return res.status(404).json({ error: "Snapshot not found" });
+            return res.status(404).json({ error: "Proposal not found" });
         }
-        console.log(`Snapshot root: ${snap.root}`);
-        console.log(`Snapshot voter count: ${Object.keys(snap.voterMap || {}).length}`);
-        const voter = snap.voterMap[userPubkey];
+        const snapshot = SNAPSHOT_DB[proposalId.toString()];
+        const voter = snapshot.voterMap[userPubkey];
         if (!voter) {
-            console.log("ERROR: Voter not found in snapshot", userPubkey);
-            console.log("Available voters:", Object.keys(snap.voterMap));
             return res.status(403).json({ error: "Ineligible" });
         }
-        console.log(`Voter found: index=${voter.index}, balance=${voter.balance}, weight=${voter.weight}`);
         const path = [];
         let currIdx = voter.index;
         for (let i = 0; i < 8; i++) {
             const siblingIdx = (currIdx % 2 === 0) ? currIdx + 1 : currIdx - 1;
-            path.push(snap.levels[i][siblingIdx]);
+            path.push(snapshot.levels[i][siblingIdx]);
             currIdx = Math.floor(currIdx / 2);
         }
-        const proof = { ...voter, path, root: snap.root };
-        console.log(`Proof generated - proposal=${proposalId} user=${userPubkey} index=${voter.index} root=${snap.root.slice(0, 16)}...`);
-        console.log(`Proof.path[0]: ${path[0].slice(0, 16)}...`);
-        console.log("=== GET-PROOF RESPONSE SENT ===");
+        const proof = { ...voter, path, root: snapshot.root };
         res.json({ success: true, proof });
     }
     catch (e) {
@@ -830,31 +753,16 @@ app.post('/get-proof', (req, res) => {
 // ==========================================
 app.post('/relay-vote', async (req, res) => {
     try {
-        console.log("RELAY-VOTE DEBUG: Received body:", JSON.stringify(req.body, null, 2));
         const { nullifier, ciphertext, pubkey, nonce, proposalId } = req.body;
-        console.log("RELAY-VOTE DEBUG: Types:", {
-            nullifier: typeof nullifier,
-            ciphertext: typeof ciphertext,
-            pubkey: typeof pubkey,
-            nonce: typeof nonce,
-            proposalId: typeof proposalId
-        });
         const proposalBn = new anchor.BN(proposalId);
         // SYNCED SEED: svrn_v5
         const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
         const [nullifierPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
-        // Helpful debug prints for explorer verification
         try {
             const nullifierBuf = Buffer.from(nullifier);
-            console.log(`Relay Vote - proposal=${proposalId}`);
-            console.log(`   proposalPda: ${proposalPda.toBase58()}`);
-            console.log(`   nullifierPda: ${nullifierPda.toBase58()}`);
-            console.log(`   nullifier (hex): ${nullifierBuf.toString('hex').slice(0, 64)}...`);
-            console.log(`   nullifier (bs58): ${bs58_1.default.encode(nullifierBuf)}`);
-            console.log(`   ciphertext length: ${Buffer.from(ciphertext).length} bytes`);
         }
         catch (logErr) {
-            console.warn('Could not print debug info for nullifier/ciphertext', logErr);
+            console.warn('Could not process nullifier', logErr);
         }
         const tx = await program.methods.submitVote([...Buffer.from(nullifier)], Buffer.from(ciphertext), [...Buffer.from(pubkey)], new anchor.BN(Buffer.from(nonce), 'le')).accounts({
             proposal: proposalPda,
@@ -862,15 +770,6 @@ app.post('/relay-vote', async (req, res) => {
             relayer: relayerWallet.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId
         }).signers([relayerWallet]).rpc();
-        // Print the returned signature + explorer link to make verification trivial
-        try {
-            console.log(`Vote relayed. tx: ${tx}`);
-            console.log(`   Explorer (devnet): https://explorer.solana.com/tx/${tx}?cluster=devnet`);
-            console.log(`   Check nullifier account: https://explorer.solana.com/address/${nullifierPda.toBase58()}?cluster=devnet`);
-        }
-        catch (logErr) {
-            console.warn('Could not print tx explorer link', logErr);
-        }
         res.json({ success: true, tx });
     }
     catch (e) {
