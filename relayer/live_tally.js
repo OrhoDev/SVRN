@@ -38,15 +38,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const anchor = __importStar(require("@coral-xyz/anchor"));
 const anchor_1 = require("@coral-xyz/anchor");
-const web3_js_1 = require("@solana/web3.js");
-const fs_1 = __importDefault(require("fs"));
-const dotenv_1 = __importDefault(require("dotenv"));
-const client_1 = require("@arcium-hq/client");
-dotenv_1.default.config();
+const web3_js_2 = require("@solana/web3.js");
+const fs_2 = __importDefault(require("fs"));
+const dotenv_2 = __importDefault(require("dotenv"));
+const client_2 = require("@arcium-hq/client");
+dotenv_2.default.config();
 // 1. CONFIGURATION
-const SOLVOTE_ID = new web3_js_1.PublicKey("2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg");
+const SOLVOTE_ID = new web3_js_2.PublicKey("2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg");
 // Arcium MXE Program ID (deployed with arcium deploy)
-const ARCIUM_ID = new web3_js_1.PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
+const ARCIUM_ID = new web3_js_2.PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
 // Note: Using Arcium SDK helper functions instead of manual PDA derivation
 // --- MANUAL POLLING HELPER (Bypasses SDK Type Errors) ---
 async function waitForComputation(connection, pda) {
@@ -74,7 +74,7 @@ async function findNextComputationId(connection, clusterOffset) {
     let id = 5; // Start from 5 (skip 0-3 broken, skip 4 which may be occupied)
     while (true) {
         const compOffset = new anchor_1.BN(id);
-        const pda = (0, client_1.getComputationAccAddress)(clusterOffset, compOffset);
+        const pda = (0, client_2.getComputationAccAddress)(clusterOffset, compOffset);
         const info = await connection.getAccountInfo(pda);
         if (!info)
             return compOffset;
@@ -89,21 +89,21 @@ async function main() {
     // Support Helius RPC via environment variable, fallback to localnet for testing
     // const rpcUrl = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
     const rpcUrl = "http://127.0.0.1:8899";
-    const connection = new web3_js_1.Connection(rpcUrl, "confirmed");
-    const keypairData = JSON.parse(fs_1.default.readFileSync('./relayer-keypair.json', 'utf-8'));
-    const keypair = web3_js_1.Keypair.fromSecretKey(new Uint8Array(keypairData));
+    const connection = new web3_js_2.Connection(rpcUrl, "confirmed");
+    const keypairData = JSON.parse(fs_2.default.readFileSync('./relayer-keypair.json', 'utf-8'));
+    const keypair = web3_js_2.Keypair.fromSecretKey(new Uint8Array(keypairData));
     const wallet = new anchor.Wallet(keypair);
     const provider = new anchor.AnchorProvider(connection, wallet, {});
     // Load IDLs
-    const solanaIdl = JSON.parse(fs_1.default.readFileSync('./idl.json', 'utf-8'));
-    const arciumIdl = JSON.parse(fs_1.default.readFileSync('./arcium_idl.json', 'utf-8'));
+    const solanaIdl = JSON.parse(fs_2.default.readFileSync('./idl.json', 'utf-8'));
+    const arciumIdl = JSON.parse(fs_2.default.readFileSync('./arcium_idl.json', 'utf-8'));
     const solanaProgram = new anchor_1.Program(solanaIdl, provider);
     const arciumProgram = new anchor_1.Program(arciumIdl, provider);
     // Get Arcium environment (cluster offset)
     // Try to get from environment, fallback to hardcoded value if not set
     let clusterOffset;
     try {
-        const arciumEnv = (0, client_1.getArciumEnv)();
+        const arciumEnv = (0, client_2.getArciumEnv)();
         clusterOffset = arciumEnv.arciumClusterOffset;
         console.log(`Using Arcium cluster offset from env: ${clusterOffset}`);
     }
@@ -124,11 +124,11 @@ async function main() {
     console.log(`Found ${allVotes.length} encrypted ballots.`);
     // 4. PROCESSING LOOP
     let totalYesPower = 0;
-    const clusterPda = (0, client_1.getClusterAccAddress)(clusterOffset);
-    const mxeAccount = (0, client_1.getMXEAccAddress)(ARCIUM_ID);
-    const mempoolAccount = (0, client_1.getMempoolAccAddress)(clusterOffset);
-    const executingPool = (0, client_1.getExecutingPoolAccAddress)(clusterOffset);
-    const compDefAccount = (0, client_1.getCompDefAccAddress)(ARCIUM_ID, Buffer.from((0, client_1.getCompDefAccOffset)("add_together")).readUInt32LE());
+    const clusterPda = (0, client_2.getClusterAccAddress)(clusterOffset);
+    const mxeAccount = (0, client_2.getMXEAccAddress)(ARCIUM_ID);
+    const mempoolAccount = (0, client_2.getMempoolAccAddress)(clusterOffset);
+    const executingPool = (0, client_2.getExecutingPoolAccAddress)(clusterOffset);
+    const compDefAccount = (0, client_2.getCompDefAccAddress)(ARCIUM_ID, Buffer.from((0, client_2.getCompDefAccOffset)("add_together")).readUInt32LE());
     // Verify computation definition exists and is ready
     const compDefInfo = await connection.getAccountInfo(compDefAccount);
     if (!compDefInfo) {
@@ -163,7 +163,7 @@ async function main() {
         try {
             // Use sequential offsets: startingOffset + i (each vote gets unique offset)
             const compOffset = new anchor_1.BN(startingOffset.toNumber() + i);
-            const compPda = (0, client_1.getComputationAccAddress)(clusterOffset, compOffset);
+            const compPda = (0, client_2.getComputationAccAddress)(clusterOffset, compOffset);
             console.log(`      > Using cluster offset: ${clusterOffset}, computation offset: ${compOffset.toString()}`);
             console.log(`      > Computation PDA: ${compPda.toString()}`);
             // A. SEND TO ARCIUM
@@ -229,7 +229,7 @@ async function main() {
         console.log("\nWINNING THRESHOLD REACHED. TRIGGERING SETTLEMENT...");
         try {
             // Reconstruct Proposal PDA
-            const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), new anchor_1.BN(1).toArrayLike(Buffer, "le", 8)], // Assuming ID 1 for tally
+            const [proposalPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), new anchor_1.BN(1).toArrayLike(Buffer, "le", 8)], // Assuming ID 1 for tally
             SOLVOTE_ID);
             const tx = await solanaProgram.methods
                 .finalizeExecution()

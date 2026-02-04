@@ -1,33 +1,41 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function (o, m, k, k2) {
+    if (k2 === undefined)
+        k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
     if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
+        desc = { enumerable: true, get: function () { return m[k]; } };
     }
     Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
+}) : (function (o, m, k, k2) {
+    if (k2 === undefined)
+        k2 = k;
     o[k2] = m[k];
 }));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function (o, v) {
     Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
+}) : function (o, v) {
     o["default"] = v;
 });
 var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
+    var ownKeys = function (o) {
         ownKeys = Object.getOwnPropertyNames || function (o) {
             var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            for (var k in o)
+                if (Object.prototype.hasOwnProperty.call(o, k))
+                    ar[ar.length] = k;
             return ar;
         };
         return ownKeys(o);
     };
     return function (mod) {
-        if (mod && mod.__esModule) return mod;
+        if (mod && mod.__esModule)
+            return mod;
         var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        if (mod != null)
+            for (var k = ownKeys(mod), i = 0; i < k.length; i++)
+                if (k[i] !== "default")
+                    __createBinding(result, mod, k[i]);
         __setModuleDefault(result, mod);
         return result;
     };
@@ -36,23 +44,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_2 = __importDefault(require("express"));
-const cors_2 = __importDefault(require("cors"));
-const express_rate_limit_2 = __importDefault(require("express-rate-limit"));
-const web3_js_2 = require("@solana/web3.js");
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const web3_js_1 = require("@solana/web3.js");
 const anchor = __importStar(require("@coral-xyz/anchor"));
-const bb_js_2 = require("@aztec/bb.js");
-const noir_js_2 = require("@noir-lang/noir_js");
-const fs_2 = __importDefault(require("fs"));
-const path_2 = __importDefault(require("path"));
-const bs58_2 = __importDefault(require("bs58"));
-const dotenv_2 = __importDefault(require("dotenv"));
-const spl_token_2 = require("@solana/spl-token");
-const bn_js_2 = require("bn.js");
-const client_2 = require("@arcium-hq/client");
-dotenv_2.default.config();
-const app = (0, express_2.default)();
-app.use((0, cors_2.default)({
+const bb_js_1 = require("@aztec/bb.js");
+const noir_js_1 = require("@noir-lang/noir_js");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const bs58_1 = __importDefault(require("bs58"));
+const dotenv_1 = __importDefault(require("dotenv"));
+const spl_token_1 = require("@solana/spl-token");
+const bn_js_1 = require("bn.js");
+const auth_config_js_1 = require("./auth-config.js");
+const client_1 = require("@arcium-hq/client");
+dotenv_1.default.config();
+const app = (0, express_1.default)();
+app.use((0, cors_1.default)({
     origin: [
         'https://solvrn.vercel.app',
         'https://solvrn-fkzpqkqr2-solvrn.vercel.app',
@@ -61,77 +70,72 @@ app.use((0, cors_2.default)({
     ],
     credentials: true
 }));
-app.use(express_2.default.json());
-const limiter = (0, express_rate_limit_2.default)({
+app.use(express_1.default.json());
+const limiter = (0, express_rate_limit_1.default)({
     windowMs: 2 * 60 * 1000,
     max: 100,
     message: { success: false, error: "Too many requests, please try again later" }
 });
 app.use(limiter);
-const tallyCircuitPath = path_2.default.join(__dirname, 'tally.json');
+const tallyCircuitPath = path_1.default.join(__dirname, 'tally.json');
 let tallyCircuit;
 try {
-    tallyCircuit = JSON.parse(fs_2.default.readFileSync(tallyCircuitPath, 'utf-8'));
+    tallyCircuit = JSON.parse(fs_1.default.readFileSync(tallyCircuitPath, 'utf-8'));
 }
 catch (e) {
-    console.warn("tally.json not found. Run 'nargo compile' and copy the json file.");
+    // Circuit file missing - will be handled gracefully
 }
 const PORT = process.env.PORT || 3000;
 const RPC_URL = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
-const PROGRAM_ID = new web3_js_2.PublicKey(process.env.PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
+const PROGRAM_ID = new web3_js_1.PublicKey(process.env.PROGRAM_ID || "AL2krCFs4WuzAdjZJbiYJCUnjJ2gmzQdtQuh7YJ3LXcv");
 // Load relayer keypair from environment variable or file
 let relayerWallet;
 if (process.env.RELAYER_KEYPAIR) {
     // From environment variable (base58 encoded secret key)
-    const secretKey = bs58_2.default.decode(process.env.RELAYER_KEYPAIR);
-    relayerWallet = web3_js_2.Keypair.fromSecretKey(secretKey);
+    const secretKey = bs58_1.default.decode(process.env.RELAYER_KEYPAIR);
+    relayerWallet = web3_js_1.Keypair.fromSecretKey(secretKey);
 }
 else {
     // From file (for local development)
     const keypairPath = process.env.RELAYER_KEYPAIR_PATH || './relayer-keypair.json';
-    if (!fs_2.default.existsSync(keypairPath)) {
+    if (!fs_1.default.existsSync(keypairPath)) {
         throw new Error(`Relayer keypair not found at ${keypairPath}. Set RELAYER_KEYPAIR env var or create keypair file.`);
     }
-    const keypairData = JSON.parse(fs_2.default.readFileSync(keypairPath, 'utf-8'));
-    relayerWallet = web3_js_2.Keypair.fromSecretKey(new Uint8Array(keypairData));
+    const keypairData = JSON.parse(fs_1.default.readFileSync(keypairPath, 'utf-8'));
+    relayerWallet = web3_js_1.Keypair.fromSecretKey(new Uint8Array(keypairData));
 }
-const idl = JSON.parse(fs_2.default.readFileSync('./idl.json', 'utf-8'));
-const connection = new web3_js_2.Connection(RPC_URL, "confirmed");
+const idl = JSON.parse(fs_1.default.readFileSync('./idl.json', 'utf-8'));
+const connection = new web3_js_1.Connection(RPC_URL, "confirmed");
 const walletWrapper = new anchor.Wallet(relayerWallet);
 const provider = new anchor.AnchorProvider(connection, walletWrapper, { commitment: "confirmed" });
 const program = new anchor.Program(idl, provider);
 // --- ARCIUM MPC SETUP ---
-const ARCIUM_ID = new web3_js_2.PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
+const ARCIUM_ID = new web3_js_1.PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
 let arciumProgram = null;
 let arciumClusterOffset = 456; // Default, can be overridden by env
 try {
-    const arciumIdl = JSON.parse(fs_2.default.readFileSync('./arcium_idl.json', 'utf-8'));
+    const arciumIdl = JSON.parse(fs_1.default.readFileSync('./arcium_idl.json', 'utf-8'));
     arciumProgram = new anchor.Program(arciumIdl, provider);
-    console.log("Arcium MPC Program loaded successfully");
     // Try to get cluster offset from env
     try {
-        const arciumEnv = (0, client_2.getArciumEnv)();
-        arciumClusterOffset = arciumEnv.arciumClusterOffset;
+        arciumClusterOffset = parseInt(process.env.ARCIUM_CLUSTER_OFFSET || '456');
     }
     catch (e) {
         arciumClusterOffset = parseInt(process.env.ARCIUM_CLUSTER_OFFSET || '456');
     }
-    console.log(`   Using Arcium cluster offset: ${arciumClusterOffset}`);
 }
 catch (e) {
-    console.warn("Arcium IDL not found - MPC decryption will be simulated");
+    // Arcium not configured - will use simulation
 }
 const SNAPSHOT_DB = {};
 // Vote storage for trusted relayer tallying
 // Maps proposalId -> array of { voter, choice, weight }
 const VOTE_STORAGE = {};
-console.log("Solvrn Relayer Online");
+// Relayer initialized
 // --- ZK KERNEL ---
 let bb;
 async function initZK() {
-    console.log("   Initializing Barretenberg WASM (Async Mode)...");
-    bb = await bb_js_2.Barretenberg.new();
-    console.log("   ZK Backend Ready");
+    bb = await bb_js_1.Barretenberg.new();
 }
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -168,7 +172,7 @@ app.get('/proposals/active', async (req, res) => {
             let isExecuted = false;
             try {
                 const proposalBn = new anchor.BN(Number(id));
-                const [proposalPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+                const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
                 const proposalAccount = await program.account.proposal.fetch(proposalPda);
                 isExecuted = proposalAccount.isExecuted;
             }
@@ -246,25 +250,24 @@ app.get('/proposals/eligible/:wallet', (req, res) => {
 async function startServer() {
     await initZK();
     app.listen(PORT, () => {
-        console.log(`Solvrn Relayer listening on http://localhost:${PORT}`);
-        console.log(`Health check: http://localhost:${PORT}/health`);
+        // Relayer started
     });
 }
 startServer();
 // --- NOIR-COMPATIBLE HASHING ---
 async function noirHash(input1, input2) {
     const toFr = (val) => {
-        if (val instanceof bb_js_2.Fr)
+        if (val instanceof bb_js_1.Fr)
             return val;
         if (typeof val === 'bigint' || typeof val === 'number')
-            return new bb_js_2.Fr(BigInt(val));
+            return new bb_js_1.Fr(BigInt(val));
         const clean = val.toString().replace('0x', '');
-        return bb_js_2.Fr.fromString(clean);
+        return bb_js_1.Fr.fromString(clean);
     };
     const f1 = toFr(input1);
     const f2 = toFr(input2);
     const result = await bb.pedersenHash([f1, f2], 0);
-    return (result instanceof bb_js_2.Fr) ? result : bb_js_2.Fr.fromBuffer(result);
+    return (result instanceof bb_js_1.Fr) ? result : bb_js_1.Fr.fromBuffer(result);
 }
 function deriveSecret(pubkeyStr) {
     const buffer = Buffer.from(pubkeyStr);
@@ -288,7 +291,7 @@ async function getHighestProposalId() {
                 // Proposal accounts start with proposal_id (8 bytes)
                 if (account.account.data.length >= 8) {
                     const proposalIdBytes = account.account.data.slice(0, 8);
-                    const proposalId = new bn_js_2.BN(proposalIdBytes, 'le').toNumber();
+                    const proposalId = new bn_js_1.BN(proposalIdBytes, 'le').toNumber();
                     // Sanity check: proposal ID should be reasonable
                     if (proposalId > 0 && proposalId < 1000000) {
                         if (proposalId > maxId) {
@@ -302,11 +305,9 @@ async function getHighestProposalId() {
                 continue;
             }
         }
-        console.log(`Found highest on-chain proposal ID: ${maxId} from ${programAccounts.length} accounts`);
         return maxId;
     }
     catch (error) {
-        console.warn('Error fetching on-chain proposal IDs:', error);
         return 0; // Default to 0 if we can't fetch
     }
 }
@@ -320,11 +321,9 @@ app.get('/next-proposal-id', async (req, res) => {
         // Use the higher of the two sources
         const highestId = Math.max(highestOnChainId, highestMemoryId);
         const nextId = highestId + 1;
-        console.log(`Next proposal ID: ${nextId} (on-chain: ${highestOnChainId}, memory: ${highestMemoryId})`);
         res.json({ success: true, nextId });
     }
     catch (error) {
-        console.error('Error getting next proposal ID:', error);
         // Fallback to memory-based logic
         const ids = Object.keys(SNAPSHOT_DB).map(Number).filter(n => !isNaN(n));
         const nextId = ids.length > 0 ? Math.max(...ids) + 1 : 2005;
@@ -343,20 +342,17 @@ app.get('/proposal/:id', (req, res) => {
 // ==========================================
 // 1. SNAPSHOT & MERKLE LOGIC (Quadratic)
 // ==========================================
-app.post('/initialize-snapshot', async (req, res) => {
+// Protected endpoints require API key
+app.post('/initialize-snapshot', auth_config_js_1.apiKeyAuth, auth_config_js_1.apiKeyRateLimit, async (req, res) => {
     try {
         if (!bb)
             return res.status(503).json({ error: "ZK Backend initializing..." });
         // UPDATED: Now destructuring metadata and creator only
         const { votingMint, proposalId, metadata, creator } = req.body;
         // Input validation
-        console.log(`[DEBUG] proposalId: ${proposalId} (type: ${typeof proposalId})`);
         if (proposalId === undefined || proposalId === null || typeof proposalId !== 'number' || proposalId < 0) {
-            console.log(`[DEBUG] proposalId validation FAILED`);
             return res.status(400).json({ success: false, error: "Invalid proposalId" });
         }
-        console.log(`[DEBUG] All validation PASSED`);
-        console.log(`[initialize-snapshot] Received: proposalId=${proposalId}, creator=${creator ? creator.slice(0, 8) + '...' : 'UNDEFINED'}`);
         const propKey = proposalId.toString();
         const response = await fetch(RPC_URL, {
             method: 'POST',
@@ -368,10 +364,8 @@ app.post('/initialize-snapshot', async (req, res) => {
         });
         const data = await response.json();
         const accounts = data.result?.token_accounts || [];
-        console.log(`[initialize-snapshot] RPC returned ${accounts.length} accounts`);
         let voters = accounts.map((acc) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v) => v.balance > 0).slice(0, 256);
-        console.log(`[initialize-snapshot] After filtering: ${voters.length} voters`);
         // PRODUCTION MODE: Only add creator if they have tokens
         if (creator) {
             const creatorInVoters = voters.find((v) => v.owner === creator);
@@ -388,49 +382,34 @@ app.post('/initialize-snapshot', async (req, res) => {
                 */
             }
             else {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... already in voter list with ${creatorInVoters.balance} tokens`);
+                // Creator already in voter list
             }
         }
-        console.log(`[initialize-snapshot] Final voter count: ${voters.length}`);
         const leavesFr = [];
         const voterMap = {};
-        console.log(`\n=== BUILDING MERKLE TREE DEBUG ===`);
-        console.log(`Total voters before tree building: ${voters.length}`);
-        for (let i = 0; i < Math.min(voters.length, 5); i++) {
-            console.log(`  [${i}] ${voters[i].owner.slice(0, 8)}... balance=${voters[i].balance}`);
-        }
-        if (voters.length > 5)
-            console.log(`  ... and ${voters.length - 5} more`);
-        console.log(`\n--- BUILDING QUADRATIC VOTING TREE (Prop #${propKey}) ---`);
-        console.log(`Total voters before creator check: ${voters.length}`);
         for (let i = 0; i < voters.length; i++) {
             const v = voters[i];
             const secretVal = deriveSecret(v.owner);
             // Feature 1: Quadratic Weighting (Square Root)
             const weight = Math.floor(Math.sqrt(v.balance));
-            console.log(`   [${i}] User: ${v.owner.slice(0, 6)}... | Bal: ${v.balance} | Weight: ${weight}`);
             const leaf = await noirHash(secretVal, weight);
             leavesFr.push(leaf);
             voterMap[v.owner] = {
                 index: i,
                 balance: v.balance,
                 weight: weight,
-                secret: "0x" + secretVal.toString(16),
+                secret: "0x" + secretVal.toString(16).padStart(64, '0'),
                 leaf: leaf.toString()
             };
         }
-        console.log(`Total voters processed: ${Object.keys(voterMap).length}`);
-        console.log(`Creator ${creator?.slice(0, 6)}... in voterMap: ${creator ? (voterMap[creator] ? 'YES' : 'NO') : 'N/A'}`);
         const zeroLeaf = await noirHash(0, 0);
         while (leavesFr.length < 256)
             leavesFr.push(zeroLeaf);
-        console.log(`Building Merkle tree with ${leavesFr.length} leaves...`);
         const levels = [leavesFr.map(f => f.toString())];
         let currentLevel = leavesFr;
         while (currentLevel.length > 1) {
             const nextLevelFr = [];
             for (let i = 0; i < currentLevel.length; i += 2) {
-                // Handle odd number of nodes by duplicating the last one
                 const left = currentLevel[i];
                 const right = (i + 1 < currentLevel.length) ? currentLevel[i + 1] : currentLevel[i];
                 const parent = await noirHash(left, right);
@@ -440,30 +419,20 @@ app.post('/initialize-snapshot', async (req, res) => {
             levels.push(currentLevel.map(f => f.toString()));
         }
         const root = levels[levels.length - 1][0];
-        console.log(`=== TREE BUILT ===`);
-        console.log(`Final root: ${root}`);
-        console.log(`Tree depth: ${levels.length}`);
-        console.log(`=== END TREE DEBUG ===`);
         // UPDATED: Now saving metadata into the DB
         SNAPSHOT_DB[propKey] = { root, voterMap, levels, metadata: metadata || {} };
-        console.log(`📸 Snapshot Built. Root: ${root.slice(0, 16)}...`);
         res.json({ success: true, root, count: voters.length });
     }
     catch (e) {
-        console.error("SNAPSHOT_ERROR:", e.message);
         res.status(500).json({ success: false, error: e.message });
     }
 });
-// ==========================================
+// ... (rest of the code remains the same)
 // PRIVACY-PRESERVING PROPOSAL CREATION
 // Relayer creates proposal on-chain (creator identity hidden)
 // ==========================================
 const CREATOR_DB = {};
-const { apiKeyAuth, apiKeyRateLimit } = require('./auth-config.js');
-app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
-    console.log('=== CREATE PROPOSAL CALLED ===');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('=== END REQUEST BODY ===');
+app.post('/create-proposal', auth_config_js_1.apiKeyAuth, auth_config_js_1.apiKeyRateLimit, async (req, res) => {
     try {
         if (!bb)
             return res.status(503).json({ error: "ZK Backend initializing..." });
@@ -472,14 +441,8 @@ app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
             return res.status(400).json({ success: false, error: "Missing required fields: votingMint, proposalId, creator" });
         }
         const propKey = proposalId.toString();
-        console.log(`\n=== CREATE-PROPOSAL (Privacy Mode) ===`);
-        console.log(`   Proposal ID: ${propKey}`);
-        console.log(`   Creator: ${creator.slice(0, 8)}... (hidden on-chain)`);
-        console.log(`   Voting Mint: ${votingMint.slice(0, 8)}...`);
-        // FEE PAYMENT VERIFICATION (Optional - for production)
-        // In production, verify creator sent SOL to relayer before creating proposal
-        // For now, we'll add a check but make it optional for demo
-        const FEE_AMOUNT_SOL = 0.01; // 0.01 SOL fee for proposal creation
+        // FEE PAYMENT VERIFICATION
+        const FEE_AMOUNT_SOL = 0.02; // 0.02 SOL fee for proposal creation
         if (paymentSignature) {
             // Verify payment transaction exists and is from creator
             try {
@@ -493,51 +456,35 @@ app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
                     });
                 }
                 // Check if payment is from creator to relayer
-                const creatorPubkey = new web3_js_2.PublicKey(creator);
+                const creatorPubkey = new web3_js_1.PublicKey(creator);
                 const paymentValid = paymentTx.transaction.message.accountKeys.some((key, idx) => {
                     return key.equals(creatorPubkey) && paymentTx.transaction.message.accountKeys.some((k, i) => k.equals(relayerWallet.publicKey) && i !== idx);
                 });
                 if (!paymentValid) {
-                    console.warn(`   Payment verification failed for ${paymentSignature}`);
+                    // Payment verification failed
                 }
                 else {
-                    console.log(`   ✅ Payment verified: ${paymentSignature.slice(0, 16)}...`);
+                    // Payment verified
                 }
             }
             catch (e) {
-                console.warn(`   Payment verification error: ${e?.message || String(e)}`);
-                // Continue anyway for demo mode
+                // Payment verification error - continue anyway
             }
         }
         else {
-            console.log(`   ⚠️  No payment signature provided (demo mode - relayer pays)`);
-            console.log(`   Production: Send ${FEE_AMOUNT_SOL} SOL to ${relayerWallet.publicKey.toBase58()} before creating proposal`);
+            // No payment signature provided (demo mode - relayer pays)
         }
         // 1. Initialize snapshot (same logic as /initialize-snapshot)
-        console.log('=== BEFORE RPC CALL IN CREATE-PROPOSAL ===');
-        let accounts = [];
-        try {
-            const response = await fetch(RPC_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0', id: 'svrn', method: 'getTokenAccounts',
-                    params: { mint: votingMint, limit: 1000, options: { showZeroBalance: false } }
-                })
-            });
-            console.log('=== RPC CALL MADE IN CREATE-PROPOSAL ===');
-            const data = await response.json();
-            console.log('=== RPC RESPONSE IN CREATE-PROPOSAL ===');
-            console.log(JSON.stringify(data, null, 2));
-            console.log('=== END RPC RESPONSE ===');
-            accounts = data.result?.token_accounts || [];
-            console.log(`=== FOUND ${accounts.length} TOKEN ACCOUNTS IN CREATE-PROPOSAL ===`);
-        } catch (error) {
-            console.log('=== RPC CALL FAILED IN CREATE-PROPOSAL ===');
-            console.log('Error:', error);
-            console.log('=== END RPC ERROR ===');
-        }
-        console.log(`=== PROCEEDING WITH ${accounts.length} ACCOUNTS ===`);
+        const response = await fetch(RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 'svrn', method: 'getTokenAccounts',
+                params: { mint: votingMint, limit: 1000, options: { showZeroBalance: false } }
+            })
+        });
+        const data = await response.json();
+        const accounts = data.result?.token_accounts || [];
         let voters = accounts.map((acc) => ({ owner: acc.owner, balance: Number(acc.amount) }))
             .filter((v) => v.balance > 0).slice(0, 256);
         // PRODUCTION MODE: Only add creator if they have tokens
@@ -556,7 +503,7 @@ app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
                 */
             }
             else {
-                console.log(`PRODUCTION MODE: Creator ${creator.slice(0, 6)}... already in voter list with ${creatorInVoters.balance} tokens`);
+                // Creator already in voter list
             }
         }
         if (voters.length === 0) {
@@ -596,52 +543,29 @@ app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
             levels.push(currentLevel.map(f => f.toString()));
         }
         const root = levels[levels.length - 1][0];
-        // Save snapshot
-        SNAPSHOT_DB[propKey] = { root, voterMap, levels, metadata: metadata || {} };
-        console.log(`   Snapshot built. Root: ${root.slice(0, 16)}...`);
-        // 2. Create proposal on-chain (RELAYER signs, not creator)
-        const proposalBn = new bn_js_2.BN(proposalId);
-        const [proposalPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
         // Convert merkle root to bytes
         const rootHex = root.replace('0x', '').padStart(64, '0');
-        const merkleRootBytes = [];
-        for (let i = 0; i < 64; i += 2) {
-            merkleRootBytes.push(parseInt(rootHex.substr(i, 2), 16));
-        }
-        const votingMintPubkey = new web3_js_2.PublicKey(votingMint);
-        const targetWalletPubkey = targetWallet ? new web3_js_2.PublicKey(targetWallet) : relayerWallet.publicKey;
-        // Calculate associated token account for proposal
-        const [vault] = web3_js_2.PublicKey.findProgramAddressSync([
-            proposalPda.toBuffer(),
-            spl_token_2.TOKEN_PROGRAM_ID.toBuffer(),
-            votingMintPubkey.toBuffer()
-        ], spl_token_2.ASSOCIATED_TOKEN_PROGRAM_ID);
-        console.log(`   Creating on-chain proposal...`);
-        console.log(`   Authority (on-chain): ${relayerWallet.publicKey.toBase58().slice(0, 8)}... (relayer)`);
-        console.log(`   Proposal Token Account: ${vault.toBase58().slice(0, 8)}...`);
-        const tx = await program.methods.initializeProposal(proposalBn, merkleRootBytes, new bn_js_2.BN(1000) // execution_amount
-        ).accounts({
+        const merkleRoot = Buffer.from(rootHex, 'hex').slice(0, 32);
+        // Generate creator commitment (ZK-friendly hash)
+        const creatorCommitment = await noirHash(Buffer.from(creator, 'utf-8'), Buffer.from(Date.now().toString()));
+        // Create proposal on-chain (RELAYER signs, not creator)
+        const proposalBn = new bn_js_1.BN(proposalId);
+        const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+        const executionAmount = 1000000; // Default 1 SOL
+        const targetWalletPubkey = targetWallet ? new web3_js_1.PublicKey(targetWallet) : relayerWallet.publicKey;
+        const votingMintPubkey = new web3_js_1.PublicKey(votingMint);
+        const treasuryMintPubkey = new web3_js_1.PublicKey("So11111111111111111111111111111111111111112"); // Wrapped SOL
+        const txid = await program.methods.initializeProposal(proposalId, merkleRoot, executionAmount, creatorCommitment).accounts({
             proposal: proposalPda,
-            proposalTokenAccount: vault, // Associated token account
             votingMint: votingMintPubkey,
-            treasuryMint: votingMintPubkey,
+            treasuryMint: treasuryMintPubkey,
             targetWallet: targetWalletPubkey,
-            relayer: relayerWallet.publicKey, // Contract expects 'relayer' not 'authority'
-            tokenProgram: spl_token_2.TOKEN_PROGRAM_ID,
-            associatedTokenProgram: spl_token_2.ASSOCIATED_TOKEN_PROGRAM_ID,
+            relayer: relayerWallet.publicKey,
+            tokenProgram: spl_token_1.TOKEN_PROGRAM_ID,
+            associatedTokenProgram: spl_token_1.ASSOCIATED_TOKEN_PROGRAM_ID,
             systemProgram: anchor.web3.SystemProgram.programId
         }).signers([relayerWallet]).rpc();
-        console.log(`   ✅ Proposal created on-chain: ${tx.slice(0, 16)}...`);
-        // 3. Store creator mapping off-chain (for finalization later)
-        CREATOR_DB[propKey] = { creator, createdAt: Date.now() };
-        res.json({
-            success: true,
-            tx,
-            proposalId: propKey,
-            root,
-            voterCount: voters.length,
-            message: "Proposal created with privacy-preserving mode (creator hidden on-chain)"
-        });
+        res.json({ success: true, tx: txid, proposalId, root });
     }
     catch (e) {
         console.error("CREATE_PROPOSAL_ERROR:", e.message);
@@ -649,7 +573,7 @@ app.post('/create-proposal', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
     }
 });
 // --- PRODUCTION ENDPOINT: Add creator to existing voting tree ---
-app.post('/add-creator', async (req, res) => {
+app.post('/add-creator', auth_config_js_1.apiKeyAuth, auth_config_js_1.apiKeyRateLimit, async (req, res) => {
     try {
         const { proposalId, creator } = req.body;
         const propKey = proposalId.toString();
@@ -683,7 +607,6 @@ app.post('/add-creator', async (req, res) => {
         }
         const balance = Number(accounts[0].amount);
         const weight = Math.floor(Math.sqrt(balance));
-        console.log(`✅ PRODUCTION: Creator found with balance ${balance}, weight ${weight}`);
         const secretVal = deriveSecret(creator);
         const leaf = await noirHash(secretVal, weight);
         // Add to voterMap with REAL balance
@@ -699,7 +622,7 @@ app.post('/add-creator', async (req, res) => {
         const voters = Object.values(snapshot.voterMap);
         const leavesFr = voters.map((v) => {
             const clean = v.leaf.toString().replace('0x', '');
-            return bb_js_2.Fr.fromString(clean);
+            return bb_js_1.Fr.fromString(clean);
         });
         // Pad to power of 2 if needed
         const zeroLeaf = await noirHash(0, 0);
@@ -726,7 +649,6 @@ app.post('/add-creator', async (req, res) => {
         const newRoot = levels[levels.length - 1][0];
         snapshot.root = newRoot;
         snapshot.levels = levels;
-        console.log(`🔧 PRODUCTION: Rebuilt tree. New root: ${newRoot.slice(0, 16)}...`);
         res.json({ success: true, message: "Creator added with real token balance", root: newRoot, balance, weight });
     }
     catch (e) {
@@ -738,7 +660,7 @@ app.post('/add-creator', async (req, res) => {
 // ==========================================
 // 2. PROOF GENERATION (Voting)
 // ==========================================
-app.post('/get-proof', apiKeyAuth, apiKeyRateLimit, (req, res) => {
+app.post('/get-proof', auth_config_js_1.apiKeyAuth, auth_config_js_1.apiKeyRateLimit, (req, res) => {
     // Debug logging removed for security
     try {
         const { proposalId, userPubkey } = req.body;
@@ -769,13 +691,13 @@ app.post('/get-proof', apiKeyAuth, apiKeyRateLimit, (req, res) => {
 // ==========================================
 // 3. VOTING (Solana Interaction)
 // ==========================================
-app.post('/relay-vote', async (req, res) => {
+app.post('/relay-vote', auth_config_js_1.apiKeyAuth, auth_config_js_1.apiKeyRateLimit, async (req, res) => {
     try {
         const { nullifier, ciphertext, pubkey, nonce, proposalId } = req.body;
         const proposalBn = new anchor.BN(proposalId);
         // SYNCED SEED: svrn_v5
-        const [proposalPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
-        const [nullifierPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
+        const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), proposalBn.toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+        const [nullifierPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("nullifier"), proposalPda.toBuffer(), Buffer.from(nullifier)], PROGRAM_ID);
         try {
             const nullifierBuf = Buffer.from(nullifier);
         }
@@ -819,8 +741,8 @@ async function findNextCompOffset(clusterOffset) {
     // Start from 5 to avoid broken offsets 0-3
     let id = 5;
     while (id < 1000) {
-        const compOffset = new bn_js_2.BN(id);
-        const pda = (0, client_2.getComputationAccAddress)(clusterOffset, compOffset);
+        const compOffset = new bn_js_1.BN(id);
+        const pda = (0, client_1.getComputationAccAddress)(clusterOffset, compOffset);
         const info = await connection.getAccountInfo(pda);
         if (!info)
             return compOffset;
@@ -839,11 +761,11 @@ async function decryptVotes(votes) {
         return simulatedDecrypt(votes);
     }
     // Get Arcium account PDAs
-    const clusterPda = (0, client_2.getClusterAccAddress)(arciumClusterOffset);
-    const mxeAccount = (0, client_2.getMXEAccAddress)(ARCIUM_ID);
-    const mempoolAccount = (0, client_2.getMempoolAccAddress)(arciumClusterOffset);
-    const executingPool = (0, client_2.getExecutingPoolAccAddress)(arciumClusterOffset);
-    const compDefAccount = (0, client_2.getCompDefAccAddress)(ARCIUM_ID, Buffer.from((0, client_2.getCompDefAccOffset)("add_together")).readUInt32LE());
+    const clusterPda = (0, client_1.getClusterAccAddress)(arciumClusterOffset);
+    const mxeAccount = (0, client_1.getMXEAccAddress)(ARCIUM_ID);
+    const mempoolAccount = (0, client_1.getMempoolAccAddress)(arciumClusterOffset);
+    const executingPool = (0, client_1.getExecutingPoolAccAddress)(arciumClusterOffset);
+    const compDefAccount = (0, client_1.getCompDefAccAddress)(ARCIUM_ID, Buffer.from((0, client_1.getCompDefAccOffset)("add_together")).readUInt32LE());
     // Verify computation definition exists
     const compDefInfo = await connection.getAccountInfo(compDefAccount);
     if (!compDefInfo) {
@@ -866,8 +788,8 @@ async function decryptVotes(votes) {
             const nonce = vote.account.nonce;
             console.log(`\n   📄 Decrypting Ballot #${i + 1}/${votes.length}...`);
             // Use sequential offsets
-            const compOffset = new bn_js_2.BN(startingOffset.toNumber() + i);
-            const compPda = (0, client_2.getComputationAccAddress)(arciumClusterOffset, compOffset);
+            const compOffset = new bn_js_1.BN(startingOffset.toNumber() + i);
+            const compPda = (0, client_1.getComputationAccAddress)(arciumClusterOffset, compOffset);
             // Parse ciphertext into two 32-byte arrays (balance, choice)
             const ciphertextArray = Array.from(ciphertext);
             const ciphertext0 = new Array(32).fill(0);
@@ -879,7 +801,7 @@ async function decryptVotes(votes) {
                 ciphertext1[j] = ciphertextArray[j + 32];
             }
             const pubkeyArray = Array.from(pubkey);
-            const nonceBN = new bn_js_2.BN(nonce.toString());
+            const nonceBN = new bn_js_1.BN(nonce.toString());
             // Submit to Arcium MPC
             console.log(`      > Submitting to Arcium MPC (offset: ${compOffset.toString()})...`);
             const tx = await arciumProgram.methods
@@ -944,7 +866,7 @@ function simulatedDecrypt(votes) {
     return { yesVotes, noVotes };
 }
 // Get current vote counts for a proposal
-app.get('/vote-counts/:proposalId', async (req, res) => {
+app.get('/vote-counts/:proposalId', auth_config_js_1.apiKeyAuth, auth_config_js_1.apiKeyRateLimit, async (req, res) => {
     try {
         const proposalId = parseInt(req.params.proposalId);
         console.log(`Getting vote counts for proposal ${proposalId}`);
@@ -994,7 +916,7 @@ app.get('/vote-counts/:proposalId', async (req, res) => {
 });
 // 4. FEATURE 2: ZK TALLY PROOF (Finalization)
 // ==========================================
-app.post('/prove-tally', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
+app.post('/prove-tally', auth_config_js_1.apiKeyAuth, auth_config_js_1.apiKeyRateLimit, async (req, res) => {
     try {
         console.log("Generating ZK Tally Proof...");
         if (!tallyCircuit)
@@ -1003,8 +925,8 @@ app.post('/prove-tally', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
         const { yesVotes, noVotes, threshold, quorum } = req.body;
         console.log(`   Inputs: yes=${yesVotes}, no=${noVotes}, threshold=${threshold}, quorum=${quorum}`);
         // 2. Setup Dedicated Backend for Tally Circuit
-        const tallyBackend = new bb_js_2.UltraHonkBackend(tallyCircuit.bytecode, bb);
-        const noir = new noir_js_2.Noir(tallyCircuit);
+        const tallyBackend = new bb_js_1.UltraHonkBackend(tallyCircuit.bytecode, bb);
+        const noir = new noir_js_1.Noir(tallyCircuit);
         // 3. Execute Circuit (Inputs must match main.nr EXACTLY)
         const inputs = {
             yes_votes: yesVotes.toString(),
@@ -1034,4 +956,3 @@ app.post('/prove-tally', apiKeyAuth, apiKeyRateLimit, async (req, res) => {
         });
     }
 });
-// Server started in startServer() function

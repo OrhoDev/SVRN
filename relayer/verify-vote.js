@@ -33,18 +33,18 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-const web3_js_1 = require("@solana/web3.js");
+const web3_js_2 = require("@solana/web3.js");
 const anchor_1 = require("@coral-xyz/anchor");
 const fs = __importStar(require("fs"));
-const PROGRAM_ID = new web3_js_1.PublicKey("2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg");
+const PROGRAM_ID = new web3_js_2.PublicKey("2BFMGPa8TvvLhyDhND8BXCDLwNibYapp1zsxBXrSrjDg");
 // const connection = new Connection("https://api.devnet.solana.com", "confirmed");
-const connection = new web3_js_1.Connection("http://127.0.0.1:8899", "confirmed");
+const connection = new web3_js_2.Connection("http://127.0.0.1:8899", "confirmed");
 async function verifyVote(proposalId) {
     console.log(`\nVerifying Proposal #${proposalId}...\n`);
     // Load IDL
     const idl = JSON.parse(fs.readFileSync('./idl.json', 'utf-8'));
     // Derive proposal PDA
-    const [proposalPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), new anchor_1.BN(proposalId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
+    const [proposalPda] = web3_js_2.PublicKey.findProgramAddressSync([Buffer.from("svrn_v5"), new anchor_1.BN(proposalId).toArrayLike(Buffer, "le", 8)], PROGRAM_ID);
     console.log("Proposal PDA:", proposalPda.toBase58());
     // Fetch proposal account
     const accountInfo = await connection.getAccountInfo(proposalPda);
@@ -55,7 +55,7 @@ async function verifyVote(proposalId) {
     console.log(`Account exists (${accountInfo.data.length} bytes)`);
     // Try to deserialize with IDL
     try {
-        const provider = new anchor_1.AnchorProvider(connection, { publicKey: web3_js_1.PublicKey.default }, {});
+        const provider = new anchor_1.AnchorProvider(connection, { publicKey: web3_js_2.PublicKey.default }, {});
         const program = new anchor_1.Program(idl, provider);
         const proposal = await program.account.proposal.fetch(proposalPda);
         console.log("\nProposal Data:");

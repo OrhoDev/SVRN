@@ -84,4 +84,6 @@ yarn-error.log
 # Package manager locks (keep npm, ignore others for now)
 # package-lock.json - KEEP
 # yarn.lock - IGNORE (if using npm)
-# pnpm-lock.yaml - IGNORE
+# pnpm-lock.yaml - IGNORE# Authentication configuration files
+relayer/auth-config.*
+sdk/dist/**

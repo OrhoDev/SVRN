@@ -37,21 +37,21 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const anchor = __importStar(require("@coral-xyz/anchor"));
-const web3_js_1 = require("@solana/web3.js");
-const client_1 = require("@arcium-hq/client");
+const web3_js_2 = require("@solana/web3.js");
+const client_2 = require("@arcium-hq/client");
 const fs = __importStar(require("fs"));
-const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
+const dotenv_2 = __importDefault(require("dotenv"));
+dotenv_2.default.config();
 async function main() {
     const RPC_URL = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
-    const connection = new web3_js_1.Connection(RPC_URL, "confirmed");
+    const connection = new web3_js_2.Connection(RPC_URL, "confirmed");
     // Load relayer keypair
     const keypairData = JSON.parse(fs.readFileSync('./relayer-keypair.json', 'utf-8'));
-    const owner = web3_js_1.Keypair.fromSecretKey(new Uint8Array(keypairData));
+    const owner = web3_js_2.Keypair.fromSecretKey(new Uint8Array(keypairData));
     const wallet = new anchor.Wallet(owner);
     const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
     // Arcium program ID
-    const PROGRAM_ID = new web3_js_1.PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
+    const PROGRAM_ID = new web3_js_2.PublicKey("DBCtofDd6f3U342nwz768FXbH6K5QyGxZUGLjFeb9JTS");
     // Load Arcium IDL
     const arciumIdl = JSON.parse(fs.readFileSync('./arcium_idl.json', 'utf-8'));
     const program = new anchor.Program(arciumIdl, provider);
@@ -60,10 +60,10 @@ async function main() {
     console.log("   Wallet:", owner.publicKey.toBase58());
     console.log("   Program:", PROGRAM_ID.toBase58());
     // Get computation definition PDA
-    const baseSeedCompDefAcc = (0, client_1.getArciumAccountBaseSeed)("ComputationDefinitionAccount");
-    const offset = (0, client_1.getCompDefAccOffset)("add_together");
-    const compDefPDA = web3_js_1.PublicKey.findProgramAddressSync([baseSeedCompDefAcc, PROGRAM_ID.toBuffer(), offset], (0, client_1.getArciumProgramId)())[0];
-    const mxeAccount = (0, client_1.getMXEAccAddress)(PROGRAM_ID);
+    const baseSeedCompDefAcc = (0, client_2.getArciumAccountBaseSeed)("ComputationDefinitionAccount");
+    const offset = (0, client_2.getCompDefAccOffset)("add_together");
+    const compDefPDA = web3_js_2.PublicKey.findProgramAddressSync([baseSeedCompDefAcc, PROGRAM_ID.toBuffer(), offset], (0, client_2.getArciumProgramId)())[0];
+    const mxeAccount = (0, client_2.getMXEAccAddress)(PROGRAM_ID);
     console.log("   CompDef PDA:", compDefPDA.toBase58());
     console.log("   MXE Account:", mxeAccount.toBase58());
     // Check current state
@@ -77,7 +77,7 @@ async function main() {
     // Try calling initAddTogetherCompDef to reinitialize
     console.log("\n📝 Calling initAddTogetherCompDef...");
     try {
-        const modifyComputeUnits = web3_js_1.ComputeBudgetProgram.setComputeUnitLimit({
+        const modifyComputeUnits = web3_js_2.ComputeBudgetProgram.setComputeUnitLimit({
             units: 600000,
         });
         const tx = await program.methods

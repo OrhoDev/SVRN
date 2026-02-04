@@ -34,18 +34,15 @@ export interface EligibleProposal extends ProposalSummary {
 }
 
 export class SolvrnApi {
-    constructor(private baseUrl: string) {}
+    constructor(private baseUrl: string, private apiKey: string) {}
 
     // --- UPDATED: Accepts Creator Argument ---
     async initializeSnapshot(proposalId: number, votingMint: string, metadata?: ProposalMetadata, creator?: string) {
-        if (process.env.NODE_ENV !== 'development') {
-            // Remove sensitive logging in production
-        }
         return this.post('initialize-snapshot', { 
             proposalId, 
             votingMint,
             metadata,
-            creator // <--- THIS MUST BE SENT TO THE RELAYER
+            creator
         });
     }
 
@@ -58,20 +55,7 @@ export class SolvrnApi {
     }
 
     async getProof(proposalId: number, userPubkey: string): Promise<ProofResponse> {
-        console.log("=== API GET-PROOF CALL ===");
-        console.log("proposalId:", proposalId);
-        console.log("userPubkey:", userPubkey);
-        console.log("baseUrl:", this.baseUrl);
-        
         const res = await this.post('get-proof', { proposalId: proposalId.toString(), userPubkey });
-        
-        console.log("=== API GET-PROOF RESPONSE ===");
-        console.log("Response success:", res.success);
-        if (res.success) {
-            console.log("Proof root:", res.proof.root);
-            console.log("Proof index:", res.proof.index);
-            console.log("Proof weight:", res.proof.weight);
-        }
         
         if (!res.success) throw new Error(res.error || "Failed to fetch merkle proof");
         return res;
@@ -211,7 +195,10 @@ export class SolvrnApi {
         
         const res = await fetch(`${this.baseUrl}/${endpoint}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-API-Key': this.apiKey  // Baked-in authentication
+            },
             body: JSON.stringify(body)
         });
         return await res.json();
@@ -238,7 +225,11 @@ export class SolvrnApi {
             throw new Error(`Endpoint '${endpoint}' is not accessible through SDK. Use direct API calls for admin functionality.`);
         }
         
-        const res = await fetch(`${this.baseUrl}/${endpoint}`);
+        const res = await fetch(`${this.baseUrl}/${endpoint}`, {
+            headers: {
+                'X-API-Key': this.apiKey  // Baked-in authentication
+            }
+        });
         return await res.json();
     }
 }

@@ -43,7 +43,7 @@ export class SolvrnClient {
     public prover: SolvrnProver;
     public encryption: SolvrnEncryption;
 
-    constructor(relayerUrl: string = 'https://missed-insulin-infrastructure-vids.trycloudflare.com', arciumProgramId?: string, programId?: string) {
+    constructor(relayerUrl: string = 'https://api.solvrn.xyz', arciumProgramId?: string, programId?: string, apiKey: string = '8420e97447a4c5166c263cbe6746af8ebee46497ba93f3509074726f726d41a5') {
         // Allow programId to be passed in constructor for flexibility
         if (programId) {
             (globalThis as any).process = (globalThis as any).process || {};
@@ -51,7 +51,7 @@ export class SolvrnClient {
             (globalThis as any).process.env.PROGRAM_ID = programId;
         }
         
-        this.api = new SolvrnApi(relayerUrl);
+        this.api = new SolvrnApi(relayerUrl, apiKey);  // API key baked in
         this.prover = new SolvrnProver();
         this.encryption = new SolvrnEncryption(arciumProgramId);
     }
