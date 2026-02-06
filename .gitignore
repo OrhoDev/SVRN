@@ -103,6 +103,7 @@ Thumbs.db
 *.tmp
 *.bak
 *.backup
+*.log
 
 # WSL specific
 .wslconfig
