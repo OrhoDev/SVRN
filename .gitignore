@@ -58,6 +58,11 @@ build/
 *.wasm
 *.wasm.gz
 
+# Barretenberg WASM files (ZK proof generation)
+barretenberg-threads.wasm.gz
+**/barretenberg-threads.wasm.gz
+**/barretenberg_wasm/
+
 # Node modules and package manager
 node_modules/
 .npm/
